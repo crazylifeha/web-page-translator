@@ -1333,11 +1333,11 @@ function showFloatButton(selection) {
 
     floatBtn = document.createElement('div');
     floatBtn.className = 'glm-float-btn';
-    floatBtn.title = '使用 GLM 翻译';
+    floatBtn.title = '划词翻译';
     
     // 使用扩展内打包的图标作为按钮内容
     const imgUrl = chrome.runtime.getURL('icons/icon.png');
-    floatBtn.innerHTML = `<img src="${imgUrl}" alt="GLM Logo" />`;
+    floatBtn.innerHTML = `<img src="${imgUrl}" alt="翻译图标" />`;
 
     // 定位在选中文字的下方居中
     floatBtn.style.left = `${rect.left + window.scrollX + rect.width / 2 - 14}px`;
@@ -1405,7 +1405,7 @@ function showSelectionBubble(originalText, translatedText, isLoading) {
   // 气泡内部 HTML 结构
   let bubbleHTML = `
     <div class="glm-bubble-header">
-      <span class="glm-bubble-title">GLM 划词翻译</span>
+      <span class="glm-bubble-title">划词翻译</span>
       <div class="glm-bubble-actions">
         ${!isLoading ? '<button class="glm-bubble-copy" id="glm-bubble-copy" title="复制译文">📋</button>' : ''}
         <button class="glm-bubble-close" id="glm-bubble-close" title="关闭卡片">&times;</button>
