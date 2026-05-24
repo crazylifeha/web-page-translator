@@ -14,6 +14,8 @@ let autoMinimizeTimeout = null; // 翻译完成后自动收起面板的定时器
 let domObserver = null; // 网页 DOM 监听器，用于支持滚动动态加载的增量翻译
 let pendingObserveBlocks = []; // 动态扫描到的待翻译积压队列
 let observeTimeout = null; // 增量翻译的防抖定时器
+let recentObservedBlocks = new WeakMap();
+const OBSERVED_BLOCK_TTL_MS = 5000;
 
 // 初始化读取快捷键配置
 chrome.storage.local.get(['shortcutTrigger'], (res) => {
@@ -386,8 +388,14 @@ function startObserveDOM() {
       scanBlocks(node, newBlocks);
       
       newBlocks.forEach(b => {
+        const lastObservedAt = recentObservedBlocks.get(b.element) || 0;
+        if (Date.now() - lastObservedAt < OBSERVED_BLOCK_TTL_MS) {
+          return;
+        }
+
         // 确认该节点既没被翻译，也没被扫描加入增量待翻译队列
         if (!b.element.hasAttribute('data-glm-id') && !b.element.hasAttribute('data-glm-scanned')) {
+          recentObservedBlocks.set(b.element, Date.now());
           b.element.setAttribute('data-glm-scanned', 'true');
           pendingObserveBlocks.push(b);
         }
@@ -435,6 +443,7 @@ function stopObserveDOM() {
   }
   clearTimeout(observeTimeout);
   pendingObserveBlocks = [];
+  recentObservedBlocks = new WeakMap();
 }
 
 // =======================================================
@@ -451,6 +460,7 @@ function startPageTranslation(settings) {
   isTranslating = true;
   originalBlocks = [];
   translatedBlocksCount = 0;
+  recentObservedBlocks = new WeakMap();
   
   if (autoMinimizeTimeout) {
     clearTimeout(autoMinimizeTimeout);
@@ -514,9 +524,11 @@ function packBlocksIntoBatches(blocks, maxCount = 50, maxCharLength = 5000) {
 
 // 串行+并行控制，避免智谱 API 速率限制
 async function processBatches(batches, sourceLang, targetLang, translateEngine) {
-  // 限制最大并发数为 5，防止高频请求瞬间打向智谱 API 触发 429 速率限制而导致指数重试延迟
-  // 如果是本地大模型，为了防止本地 CPU 推理发生算力抢占而卡死，将并发限制为 1，进行完全串行排队翻译
-  const maxConcurrency = translateEngine === 'local-llm' ? 1 : 5;
+  // Google 免费通道更容易触发频率限制，因此单独收紧并发。
+  const maxConcurrency =
+    translateEngine === 'local-llm' ? 1 :
+    translateEngine === 'google' ? 2 :
+    5;
   let index = 0;
 
   async function runNext() {

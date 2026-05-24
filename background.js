@@ -337,12 +337,17 @@ async function translateBatchGoogle(textsDict, sourceLang, targetLang) {
 
   const sl = getGoogleLangCode(sourceLang);
   const tl = getGoogleLangCode(targetLang);
+  const maxConcurrency = 3;
+  let index = 0;
+  const results = {};
 
-  const promises = keys.map(async (key) => {
+  async function translateOne(key) {
     const text = textsDict[key];
     if (!text || !text.trim()) {
-      return { key, translated: '' };
+      results[key] = '';
+      return;
     }
+
     try {
       const url = `https://translate.googleapis.com/translate_a/single?client=gtx&sl=${sl}&tl=${tl}&dt=t&q=${encodeURIComponent(text)}`;
       const res = await fetch(url);
@@ -355,20 +360,29 @@ async function translateBatchGoogle(textsDict, sourceLang, targetLang) {
           .map(item => item[0])
           .filter(Boolean)
           .join('');
-        return { key, translated: translatedText };
+        results[key] = translatedText;
+        return;
       }
-      return { key, translated: text };
+      results[key] = text;
     } catch (err) {
       console.error(`Google translate segment failed:`, err);
-      return { key, translated: text };
+      results[key] = text;
     }
-  });
+  }
 
-  const resultsList = await Promise.all(promises);
-  const results = {};
-  resultsList.forEach(item => {
-    results[item.key] = item.translated;
-  });
+  async function runNext() {
+    while (index < keys.length) {
+      const key = keys[index++];
+      await translateOne(key);
+    }
+  }
+
+  const workers = Array.from(
+    { length: Math.min(maxConcurrency, keys.length) },
+    () => runNext()
+  );
+
+  await Promise.all(workers);
   return results;
 }
 
