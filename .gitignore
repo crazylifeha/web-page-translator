@@ -1,0 +1,24 @@
+# OS
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# Extension packaging
+*.zip
+*.crx
+*.pem
+*.xpi
+
+# Secrets
+.env
+.env.*
+*.key
+
+# Editor
+.vscode/
+.idea/
+*.swp
+*~
+
+# Logs
+*.log

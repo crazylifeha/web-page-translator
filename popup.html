@@ -1,0 +1,217 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>网页智能翻译</title>
+  <link rel="stylesheet" href="popup.css">
+</head>
+
+<body>
+  <div class="container">
+    <!-- 头部区域 -->
+    <header>
+      <div class="logo-area">
+        <img src="icons/icon48.png" alt="Logo" class="logo">
+        <div class="title-desc">
+          <h1>网页智能翻译</h1>
+          <p class="subtitle">多引擎驱动的智能对照翻译框架</p>
+        </div>
+      </div>
+    </header>
+
+    <!-- 可滚动内容区 -->
+    <div class="scroll-content">
+      <!-- 翻译引擎与配置卡片 -->
+      <section class="card" id="engine-card">
+        <div class="form-row">
+          <label for="translate-engine">翻译引擎</label>
+          <select id="translate-engine">
+            <option value="zhipu" selected>大模型 API</option>
+            <option value="local-llm">本地大模型</option>
+            <option value="google">谷歌翻译</option>
+            <option value="microsoft">微软翻译</option>
+          </select>
+        </div>
+
+        <!-- 大模型 API 配置区域 -->
+        <div id="zhipu-config-section" class="engine-config-section">
+          <div class="card-header config-header">
+            <div class="title-with-badge">
+              <span class="card-title">大模型 API 配置</span>
+              <span id="api-status" class="status-badge status-unset">未配置</span>
+            </div>
+          </div>
+          <div class="input-group">
+            <div class="password-wrapper">
+              <input type="password" id="api-key" placeholder="请输入 API Key (如智谱 AI Key)" />
+              <button id="toggle-visible" type="button" title="显示/隐藏">
+                <svg class="eye-icon" viewBox="0 0 24 24" width="16" height="16">
+                  <path
+                    d="M12 4.5C7 4.5 2.73 7.61 1 12c1.73 4.39 6 7.5 11 7.5s9.27-3.11 11-7.5c-1.73-4.39-6-7.5-11-7.5zM12 17c-2.76 0-5-2.24-5-5s2.24-5 5-5 5 2.24 5 5-2.24 5-5 5zm0-8c-1.66 0-3 1.34-3 3s1.34 3 3 3 3-1.34 3-3-1.34-3-3-3z" />
+                </svg>
+              </button>
+            </div>
+            <div id="api-error-msg" class="api-error-message" style="display: none;"></div>
+          </div>
+          <!-- 模型识别信息展示区域 -->
+          <div id="model-detected-info" class="model-detected-info" style="display: none;">
+            <span class="model-info-icon">🤖</span>
+            <span id="detected-model-text">检测到模型：-</span>
+          </div>
+        </div>
+
+        <!-- 本地大模型 配置区域 -->
+        <div id="local-llm-config-section" class="engine-config-section card-hidden">
+          <div class="card-header config-header">
+            <div class="title-with-badge">
+              <span class="card-title">本地大模型配置</span>
+              <span id="local-api-status" class="status-badge status-unset">未连接</span>
+            </div>
+          </div>
+          
+          <!-- API 地址 -->
+          <div class="form-row">
+            <label for="local-api-url">API 地址</label>
+            <input type="text" id="local-api-url" placeholder="如 http://localhost:1234/v1/chat/completions" value="http://localhost:1234/v1/chat/completions" />
+          </div>
+
+          <!-- 模型选择 -->
+          <div class="form-row">
+            <label>模型选择</label>
+            <div id="local-model-container">
+              <input type="text" id="local-model-name" placeholder="请输入模型名称，如 qwen2.5" />
+            </div>
+          </div>
+
+          <!-- API Key (选填) -->
+          <div class="form-row">
+            <label for="local-api-key">API Key (选填)</label>
+            <div class="password-wrapper">
+              <input type="password" id="local-api-key" placeholder="若本地 API 无需 Key 请留空" />
+              <button id="local-toggle-visible" type="button" title="显示/隐藏">
+                <svg class="eye-icon" viewBox="0 0 24 24" width="16" height="16">
+                  <path
+                    d="M12 4.5C7 4.5 2.73 7.61 1 12c1.73 4.39 6 7.5 11 7.5s9.27-3.11 11-7.5c-1.73-4.39-6-7.5-11-7.5zM12 17c-2.76 0-5-2.24-5-5s2.24-5 5-5 5 2.24 5 5-2.24 5-5 5zm0-8c-1.66 0-3 1.34-3 3s1.34 3 3 3 3-1.34 3-3-1.34-3-3-3z" />
+                </svg>
+              </button>
+            </div>
+          </div>
+          
+          <div id="local-api-error-msg" class="api-error-message" style="display: none;"></div>
+        </div>
+      </section>
+
+      <!-- 翻译选项卡片 -->
+      <section class="card">
+        <span class="card-title select-title">翻译设置</span>
+
+        <!-- 语言选择 -->
+        <div class="select-row">
+          <div class="select-col">
+            <label for="source-lang">源语言</label>
+            <select id="source-lang">
+              <option value="auto">自动检测</option>
+              <option value="en">英语 (English)</option>
+              <option value="zh">中文 (Chinese)</option>
+              <option value="ja">日语 (Japanese)</option>
+              <option value="ko">韩语 (Korean)</option>
+              <option value="fr">法语 (French)</option>
+              <option value="de">德语 (German)</option>
+              <option value="es">西班牙语 (Spanish)</option>
+            </select>
+          </div>
+          <div class="select-col">
+            <label for="target-lang">目标语言</label>
+            <select id="target-lang">
+              <option value="zh" selected>中文 (Chinese)</option>
+              <option value="en">英语 (English)</option>
+              <option value="ja">日语 (Japanese)</option>
+              <option value="ko">韩语 (Korean)</option>
+              <option value="fr">法语 (French)</option>
+              <option value="de">德语 (German)</option>
+            </select>
+          </div>
+        </div>
+
+        <!-- 展示模式与划词翻译并排 -->
+        <div class="form-row-mix">
+          <div class="form-col-left">
+            <label for="display-mode">译文展示模式</label>
+            <select id="display-mode">
+              <option value="bilingual" selected>双语对照 (推荐)</option>
+              <option value="translation-only">只看译文</option>
+            </select>
+          </div>
+          <div class="form-col-right">
+            <label for="enable-selection-translate">启用划词翻译</label>
+            <label class="switch">
+              <input type="checkbox" id="enable-selection-translate" checked>
+              <span class="slider"></span>
+            </label>
+          </div>
+        </div>
+
+        <!-- 快捷键自定义 -->
+        <div class="form-row shortcut-setting-row">
+          <label for="shortcut-trigger-input">触发翻译快捷键</label>
+          <div class="shortcut-recorder-wrapper">
+            <input type="text" id="shortcut-trigger-input" readonly placeholder="点击录制快捷键" title="点击后直接在键盘按下组合键进行录制">
+            <button id="btn-reset-shortcut" type="button" title="重置为默认 Alt+C">&#x21bb;</button>
+          </div>
+        </div>
+
+        <!-- 译文颜色微调 -->
+        <div class="form-row style-row">
+          <label>译文颜色</label>
+          <div class="color-options">
+            <div class="color-dot active" data-color="#7c3aed" style="background-color: #7c3aed;" title="经典紫"></div>
+            <div class="color-dot" data-color="#2563eb" style="background-color: #2563eb;" title="深邃蓝"></div>
+            <div class="color-dot" data-color="#4b5563" style="background-color: #4b5563;" title="极客灰"></div>
+            <div class="color-dot" data-color="#059669" style="background-color: #059669;" title="翡翠绿"></div>
+            <div class="color-dot" data-color="#ea580c" style="background-color: #ea580c;" title="珊瑚橙"></div>
+            <!-- 自定义颜色选项 -->
+            <div class="color-dot custom-color-dot" id="custom-color-btn" title="自定义颜色"></div>
+            <input type="color" id="custom-color-picker" style="display: none;" value="#7c3aed">
+          </div>
+        </div>
+      </section>
+
+      <!-- 快捷键指南卡片 (默认折叠以节省空间) -->
+      <details class="card shortcut-card">
+        <summary class="card-title">快捷键使用指南</summary>
+        <div class="shortcut-list">
+          <div class="shortcut-item">
+            <span class="shortcut-key">Ctrl + Shift + Y</span>
+            <span class="shortcut-desc">翻译当前页面 (Chrome系统全局)</span>
+          </div>
+          <div class="shortcut-item">
+            <span class="shortcut-key" id="guide-shortcut-key-web">Alt + C</span>
+            <span class="shortcut-desc">网页内触发翻译</span>
+          </div>
+          <div class="shortcut-item">
+            <span class="shortcut-key">Alt + R</span>
+            <span class="shortcut-desc">网页内恢复原文</span>
+          </div>
+        </div>
+      </details>
+    </div>
+
+    <!-- 固定底部操作按钮及页脚 -->
+    <div class="footer-actions">
+      <div class="actions">
+        <button id="btn-translate" class="btn btn-primary">翻译当前页面</button>
+        <button id="btn-restore" class="btn btn-secondary">恢复网页原文</button>
+      </div>
+
+      <footer>
+        <p>智能翻译助手 v1.0.0 • 极速安全</p>
+      </footer>
+    </div>
+  </div>
+
+  <script src="popup.js"></script>
+</body>
+
+</html>

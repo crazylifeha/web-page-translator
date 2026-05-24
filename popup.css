@@ -1,0 +1,665 @@
+/* GLM Web Translator Popup Style */
+:root {
+  --bg-gradient: linear-gradient(135deg, #0f172a 0%, #1e1b4b 100%);
+  --card-bg: rgba(30, 41, 59, 0.7);
+  --border-color: rgba(255, 255, 255, 0.08);
+  --text-primary: #f8fafc;
+  --text-secondary: #94a3b8;
+  --primary-gradient: linear-gradient(135deg, #7c3aed 0%, #2563eb 100%);
+  --primary-hover-gradient: linear-gradient(135deg, #8b5cf6 0%, #3b82f6 100%);
+  --transition-speed: 0.2s;
+}
+
+* {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
+
+body {
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+  background: var(--bg-gradient);
+  color: var(--text-primary);
+  width: 360px;
+  height: 596px; /* 高度调满至最大安全规格 596px */
+  overflow: hidden; /* 禁用 body 全局滚动，改由内部区域滚动 */
+  padding: 14px 16px;
+}
+
+.container {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+}
+
+/* 中间配置项自适应滚动区 */
+.scroll-content {
+  flex: 1;
+  overflow-y: auto;
+  padding-right: 6px; /* 为滚动条留出间距，避免挤压内容 */
+  margin-bottom: 8px; /* 适当调小底部外边距，为内容腾出更多视口空间 */
+  display: flex;
+  flex-direction: column;
+  gap: 10px; /* 稍微压缩卡片间隔 */
+}
+
+/* 滚动条定制，打造 premium 质感 */
+.scroll-content::-webkit-scrollbar {
+  width: 6px;
+}
+
+.scroll-content::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.scroll-content::-webkit-scrollbar-thumb {
+  background: rgba(255, 255, 255, 0.12);
+  border-radius: 10px;
+  transition: background-color var(--transition-speed);
+}
+
+.scroll-content::-webkit-scrollbar-thumb:hover {
+  background: rgba(255, 255, 255, 0.25);
+}
+
+/* 固定底部操作按钮与页脚 */
+.footer-actions {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding-top: 12px;
+  border-top: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+
+/* Header */
+header {
+  padding-bottom: 4px;
+}
+
+.logo-area {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.logo {
+  width: 42px;
+  height: 42px;
+  border-radius: 10px;
+  box-shadow: 0 4px 12px rgba(124, 58, 237, 0.3);
+  object-fit: cover;
+  border: 1px solid rgba(255, 255, 255, 0.15);
+}
+
+.title-desc h1 {
+  font-size: 16px;
+  font-weight: 700;
+  letter-spacing: 0.5px;
+  background: linear-gradient(135deg, #a78bfa 0%, #60a5fa 100%);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+}
+
+.subtitle {
+  font-size: 11px;
+  color: var(--text-secondary);
+  margin-top: 2px;
+}
+
+/* Cards */
+.card {
+  background: var(--card-bg);
+  border: 1px solid var(--border-color);
+  border-radius: 12px;
+  padding: 12px;
+  backdrop-filter: blur(10px);
+  box-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.2);
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.card-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.card-title {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text-primary);
+  letter-spacing: 0.3px;
+}
+
+.select-title {
+  margin-bottom: 2px;
+}
+
+/* Status Badges */
+.status-badge {
+  font-size: 10px;
+  padding: 3px 8px;
+  border-radius: 20px;
+  font-weight: 500;
+  letter-spacing: 0.2px;
+  transition: all var(--transition-speed) ease;
+}
+
+.status-unset {
+  background: rgba(148, 163, 184, 0.1);
+  color: #94a3b8;
+  border: 1px solid rgba(148, 163, 184, 0.2);
+}
+
+.status-checking {
+  background: rgba(245, 158, 11, 0.1);
+  color: #fbbf24;
+  border: 1px solid rgba(245, 158, 11, 0.2);
+  animation: pulse 1.5s infinite alternate;
+}
+
+.status-valid {
+  background: rgba(16, 185, 129, 0.1);
+  color: #34d399;
+  border: 1px solid rgba(16, 185, 129, 0.2);
+  box-shadow: 0 0 8px rgba(16, 185, 129, 0.2);
+}
+
+.status-invalid {
+  background: rgba(239, 68, 68, 0.1);
+  color: #f87171;
+  border: 1px solid rgba(239, 68, 68, 0.2);
+}
+
+@keyframes pulse {
+  0% { opacity: 0.6; }
+  100% { opacity: 1; }
+}
+
+/* Input Fields & Buttons Inside Password Wrapper */
+.password-wrapper {
+  position: relative;
+  display: flex;
+  align-items: center;
+}
+
+input[type="password"],
+input[type="text"] {
+  width: 100%;
+  padding: 8px 36px 8px 10px;
+  background: rgba(15, 23, 42, 0.5);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 8px;
+  color: var(--text-primary);
+  font-size: 12px;
+  outline: none;
+  font-family: monospace;
+  transition: border-color var(--transition-speed);
+}
+
+input[type="password"]:focus,
+input[type="text"]:focus {
+  border-color: #6366f1;
+  box-shadow: 0 0 0 2px rgba(99, 102, 241, 0.25);
+}
+
+#toggle-visible {
+  position: absolute;
+  right: 12px;
+  background: none;
+  border: none;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  opacity: 0.5;
+  transition: opacity var(--transition-speed);
+}
+
+#toggle-visible:hover {
+  opacity: 0.9;
+}
+
+.eye-icon {
+  fill: var(--text-primary);
+}
+
+.help-link-wrapper {
+  display: flex;
+  justify-content: flex-end;
+}
+
+.help-link {
+  font-size: 11px;
+  color: #818cf8;
+  text-decoration: none;
+  transition: color var(--transition-speed);
+}
+
+.help-link:hover {
+  color: #a5b4fc;
+}
+
+/* Dropdowns & Labels */
+.select-row {
+  display: flex;
+  gap: 12px;
+}
+
+.select-col {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+label {
+  font-size: 11px;
+  color: var(--text-secondary);
+  font-weight: 500;
+}
+
+select {
+  width: 100%;
+  padding: 7px 24px 7px 8px;
+  background: rgba(15, 23, 42, 0.5);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 8px;
+  color: var(--text-primary);
+  font-size: 12px;
+  outline: none;
+  cursor: pointer;
+  appearance: none;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='%2394a3b8' width='18' height='18'%3E%3Cpath d='M7 10l5 5 5-5H7z'/%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: right 6px center;
+  transition: border-color var(--transition-speed);
+}
+
+select:focus {
+  border-color: #6366f1;
+}
+
+.form-row {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.style-row {
+  display: flex;
+  flex-direction: row;
+  justify-content: space-between;
+  align-items: center;
+}
+
+/* Color Options Dot Selector */
+.color-options {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+}
+
+.color-dot {
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  cursor: pointer;
+  border: 2px solid transparent;
+  transition: transform 0.15s ease, border-color 0.15s ease;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
+}
+
+.color-dot:hover {
+  transform: scale(1.2);
+}
+
+.color-dot.active {
+  border-color: #fff;
+  transform: scale(1.15);
+  box-shadow: 0 0 8px rgba(255, 255, 255, 0.6);
+}
+
+/* 自定义拾色器特殊样式 */
+.custom-color-dot {
+  background: linear-gradient(135deg, #ff007f, #7f00ff, #00f0ff);
+  border-radius: 50% !important; /* 强制设定为完美圆形 */
+  width: 18px !important;
+  height: 18px !important;
+}
+
+#custom-color-picker {
+  display: none;
+}
+
+/* Action Buttons */
+.actions {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  margin-top: 4px;
+}
+
+.btn {
+  width: 100%;
+  padding: 11px;
+  border-radius: 10px;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  outline: none;
+  border: none;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all var(--transition-speed) ease;
+}
+
+.btn-primary {
+  background: var(--primary-gradient);
+  color: #fff;
+  box-shadow: 0 4px 14px rgba(99, 102, 241, 0.4);
+}
+
+.btn-primary:hover {
+  background: var(--primary-hover-gradient);
+  transform: translateY(-1px);
+  box-shadow: 0 6px 18px rgba(99, 102, 241, 0.5);
+}
+
+.btn-primary:active {
+  transform: translateY(0);
+}
+
+.btn-secondary {
+  background: rgba(255, 255, 255, 0.05);
+  color: var(--text-secondary);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.btn-secondary:hover {
+  background: rgba(239, 68, 68, 0.1);
+  color: #f87171;
+  border-color: rgba(239, 68, 68, 0.3);
+}
+
+/* Footer */
+footer {
+  text-align: center;
+  margin-top: 4px;
+}
+
+footer p {
+  font-size: 10px;
+  color: rgba(148, 163, 184, 0.5);
+}
+
+/* Switch 滑动开关样式 */
+.switch-row {
+  flex-direction: row !important;
+  justify-content: space-between !important;
+  align-items: center !important;
+}
+
+.switch {
+  position: relative;
+  display: inline-block;
+  width: 36px;
+  height: 20px;
+}
+
+.switch input {
+  opacity: 0;
+  width: 0;
+  height: 0;
+}
+
+.slider {
+  position: absolute;
+  cursor: pointer;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background-color: rgba(255, 255, 255, 0.1);
+  transition: .3s;
+  border-radius: 20px;
+  border: 1px solid rgba(255, 255, 255, 0.05);
+}
+
+.slider:before {
+  position: absolute;
+  content: "";
+  height: 14px;
+  width: 14px;
+  left: 2px;
+  bottom: 2px;
+  background-color: #94a3b8;
+  transition: .3s;
+  border-radius: 50%;
+}
+
+input:checked + .slider {
+  background: var(--primary-gradient);
+}
+
+input:checked + .slider:before {
+  transform: translateX(16px);
+  background-color: #fff;
+}
+
+/* 快捷键指南折叠样式 */
+.shortcut-card {
+  padding: 10px 12px !important;
+  background: rgba(30, 41, 59, 0.45) !important;
+  transition: all var(--transition-speed) ease;
+}
+
+.shortcut-card[open] {
+  background: rgba(30, 41, 59, 0.6) !important;
+}
+
+.shortcut-card summary {
+  cursor: pointer;
+  outline: none;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text-primary);
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  user-select: none;
+  list-style: none; /* 去除 Chrome 默认三角形 */
+}
+
+/* 兼容 Safari 的默认三角形去除 */
+.shortcut-card summary::-webkit-details-marker {
+  display: none;
+}
+
+.shortcut-card summary::after {
+  content: "＋";
+  font-size: 12px;
+  color: var(--text-secondary);
+  transition: transform var(--transition-speed);
+}
+
+.shortcut-card[open] summary::after {
+  content: "－";
+}
+
+.shortcut-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin-top: 10px;
+  padding-top: 8px;
+  border-top: 1px solid rgba(255, 255, 255, 0.05);
+}
+
+.shortcut-item {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  font-size: 11px;
+}
+
+.shortcut-key {
+  font-family: monospace;
+  background: rgba(15, 23, 42, 0.6);
+  color: #a78bfa;
+  padding: 2px 6px;
+  border-radius: 4px;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  font-size: 10px;
+  font-weight: 600;
+}
+
+.shortcut-desc {
+  color: var(--text-secondary);
+}
+
+/* 自定义快捷键录制区域 */
+.shortcut-setting-row {
+  margin-top: 2px;
+}
+
+.shortcut-recorder-wrapper {
+  position: relative;
+  display: flex;
+  align-items: center;
+  width: 100%;
+}
+
+#shortcut-trigger-input {
+  cursor: pointer;
+  caret-color: transparent; /* 隐藏只读录制的光标 */
+  font-weight: 600;
+  text-align: center;
+  padding-right: 36px !important;
+  background: rgba(15, 23, 42, 0.6) !important;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  transition: all 0.25s ease;
+}
+
+#shortcut-trigger-input.recording {
+  border-color: #a78bfa !important;
+  background: rgba(124, 58, 237, 0.1) !important;
+  box-shadow: 0 0 10px rgba(167, 139, 250, 0.35) !important;
+  animation: border-glow 1.5s infinite ease-in-out;
+}
+
+@keyframes border-glow {
+  0% { border-color: rgba(167, 139, 250, 0.5); }
+  50% { border-color: rgba(167, 139, 250, 1); }
+  100% { border-color: rgba(167, 139, 250, 0.5); }
+}
+
+#btn-reset-shortcut {
+  position: absolute;
+  right: 10px;
+  background: none !important;
+  border: none !important;
+  color: var(--text-secondary) !important;
+  font-size: 16px !important;
+  cursor: pointer !important;
+  display: flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  transition: all 0.2s !important;
+  width: 22px !important;
+  height: 22px !important;
+  opacity: 0.6;
+}
+
+#btn-reset-shortcut:hover {
+  color: #a78bfa !important;
+  transform: rotate(-180deg);
+  opacity: 1;
+}
+
+.api-error-message {
+  font-size: 11px !important;
+  color: #f87171 !important;
+  background: rgba(239, 68, 68, 0.08) !important;
+  border: 1px solid rgba(239, 68, 68, 0.15) !important;
+  border-radius: 6px !important;
+  padding: 6px 10px !important;
+  margin-top: 6px !important;
+  line-height: 1.4 !important;
+  word-break: break-all !important;
+}
+
+/* 免 Key 提示及隐藏配置区域样式 */
+.card-hidden {
+  display: none !important;
+}
+
+.engine-config-section {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  margin-top: 6px;
+  padding-top: 10px;
+  border-top: 1px solid rgba(255, 255, 255, 0.05); /* 加一条浅分割线区分引擎选择与配置 */
+}
+
+.config-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+/* 并排复合表单布局，压缩整体高度 */
+.form-row-mix {
+  display: flex;
+  gap: 12px;
+  align-items: flex-end;
+}
+
+.form-col-left {
+  flex: 1.4;
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+}
+
+.form-col-right {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+  align-items: flex-end;
+}
+
+.form-col-right label {
+  align-self: flex-end;
+}
+
+.title-with-badge {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+/* 模型识别提示区域样式，科技感高级感 */
+.model-detected-info {
+  font-size: 11px !important;
+  color: #a78bfa !important; 
+  background: rgba(167, 139, 250, 0.06) !important;
+  border: 1px solid rgba(167, 139, 250, 0.15) !important;
+  border-radius: 6px !important;
+  padding: 6px 10px !important;
+  margin-top: 4px !important;
+  display: flex !important;
+  align-items: center !important;
+  gap: 6px !important;
+}
+
+.model-info-icon {
+  font-size: 12px;
+}
+
+

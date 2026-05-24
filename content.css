@@ -1,0 +1,490 @@
+/* GLM Translator Content Injection Styles */
+
+:root {
+  --glm-translate-color: #7c3aed;
+  --glm-translate-bg: color-mix(in srgb, var(--glm-translate-color) 8%, transparent);
+}
+
+.glm-translated {
+  color: inherit !important;
+  font-size: 0.95em;
+  line-height: 1.6;
+  transition: all 0.3s ease;
+  font-family: "Times New Roman", Times, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, "Microsoft YaHei", sans-serif !important;
+  word-break: break-word !important;
+  overflow-wrap: break-word !important;
+  white-space: normal !important;
+  max-width: 100% !important;
+  overflow: hidden !important;
+}
+
+/* 终极兜底：若翻译元素内部完全没有子节点内容，强制隐藏，杜绝空紫色条 */
+.glm-translated:empty {
+  display: none !important;
+}
+
+/* 块级段落及 DIV 译文样式 */
+p.glm-translated, div.glm-translated {
+  margin-top: 8px !important;
+  margin-bottom: 10px !important;
+  display: block !important;
+  padding: 8px 12px !important;
+  background-color: var(--glm-translate-bg) !important;
+  border-radius: 8px !important;
+  box-sizing: border-box !important;
+}
+
+/* 标题级译文样式 */
+h1.glm-translated, h2.glm-translated, h3.glm-translated, h4.glm-translated, h5.glm-translated, h6.glm-translated {
+  margin-top: 6px !important;
+  margin-bottom: 6px !important;
+  display: block !important;
+  font-weight: 600;
+  padding: 4px 10px !important;
+  background-color: var(--glm-translate-bg) !important;
+  border-radius: 6px !important;
+  box-sizing: border-box !important;
+}
+
+/* 行内译文样式 */
+span.glm-translated {
+  display: inline-block !important;
+  margin-left: 4px;
+  margin-right: 4px;
+  padding: 2px 6px !important;
+  background-color: var(--glm-translate-bg) !important;
+  border-radius: 4px !important;
+  border-bottom: 1px dashed var(--glm-translate-color) !important;
+}
+
+/* 列表项译文样式 */
+li.glm-translated {
+  margin-top: 4px !important;
+  display: block !important;
+  padding: 6px 12px !important;
+  background-color: var(--glm-translate-bg) !important;
+  border-radius: 6px !important;
+  box-sizing: border-box !important;
+}
+
+/* 双语模式 / 仅译文模式 / 仅原文模式 控制规则 */
+
+/* 译文模式：隐藏所有标记了 data-glm-id 的原文元素（兄弟插入模式：p/div/h1~h6等） */
+body.glm-mode-translation-only [data-glm-id]:not([data-glm-inline]) {
+  display: none !important;
+}
+/* 译文模式：对于子元素插入模式（li/td/th），不隐藏容器自身，只隐藏内部的原文包裹 span */
+body.glm-mode-translation-only [data-glm-inline] > .glm-original-content {
+  display: none !important;
+}
+
+/* 原文模式：隐藏所有翻译元素 */
+body.glm-mode-original-only .glm-translated {
+  display: none !important;
+}
+
+
+/* =======================================================
+   右下角悬浮控制条 (Widget)
+   ======================================================= */
+.glm-translate-widget {
+  position: fixed;
+  bottom: 24px;
+  right: 24px;
+  width: 280px;
+  background: rgba(15, 23, 42, 0.85) !important;
+  backdrop-filter: blur(12px) !important;
+  border: 1px solid rgba(255, 255, 255, 0.1) !important;
+  border-radius: 16px !important;
+  padding: 16px !important;
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.3) !important;
+  z-index: 1000000000 !important;
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif !important;
+  color: #f8fafc !important;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  user-select: none;
+}
+
+.glm-translate-widget.dragging {
+  transition: none !important;
+}
+
+.glm-widget-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  cursor: move !important;
+}
+
+.glm-widget-title {
+  font-size: 13px !important;
+  font-weight: 700 !important;
+  background: linear-gradient(135deg, #a78bfa 0%, #60a5fa 100%);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+}
+
+/* 按钮组容器 */
+.glm-widget-header-btns {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+/* 图标按钮通用样式 */
+.glm-widget-btn-icon {
+  background: none !important;
+  border: none !important;
+  color: #94a3b8 !important;
+  cursor: pointer !important;
+  font-size: 16px !important;
+  line-height: 1 !important;
+  padding: 4px !important;
+  border-radius: 4px !important;
+  transition: all 0.2s !important;
+  display: flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  width: 22px !important;
+  height: 22px !important;
+}
+
+.glm-widget-btn-icon:hover {
+  color: #fff !important;
+  background: rgba(255, 255, 255, 0.1) !important;
+}
+
+#glm-widget-close:hover {
+  color: #ef4444 !important;
+  background: rgba(239, 68, 68, 0.15) !important;
+}
+
+/* 折叠逻辑的 CSS 控制 */
+.glm-translate-widget .glm-widget-collapsed-content {
+  display: none;
+}
+
+.glm-translate-widget .glm-widget-expanded-content {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+/* 处于折叠状态时的 Widget 样式 */
+.glm-translate-widget.minimized {
+  width: 52px !important;
+  height: 52px !important;
+  padding: 0 !important;
+  border-radius: 50% !important;
+  cursor: move !important;
+  justify-content: center !important;
+  align-items: center !important;
+  background: linear-gradient(135deg, rgba(124, 58, 237, 0.95), rgba(37, 99, 235, 0.95)) !important;
+  border: 1px solid rgba(255, 255, 255, 0.25) !important;
+  box-shadow: 0 8px 24px rgba(124, 58, 237, 0.4) !important;
+  overflow: visible !important;
+}
+
+.glm-translate-widget.minimized:hover {
+  transform: scale(1.08);
+  box-shadow: 0 8px 32px rgba(124, 58, 237, 0.6) !important;
+}
+
+.glm-translate-widget.minimized .glm-widget-expanded-content {
+  display: none !important;
+}
+
+.glm-translate-widget.minimized .glm-widget-collapsed-content {
+  display: flex !important;
+  justify-content: center;
+  align-items: center;
+  width: 100%;
+  height: 100%;
+  position: relative;
+}
+
+/* 折叠状态下的 Logo */
+.glm-widget-collapsed-logo {
+  width: 28px !important;
+  height: 28px !important;
+  border-radius: 50%;
+  animation: pulse-glow 2s infinite ease-in-out;
+}
+
+@keyframes pulse-glow {
+  0% { transform: scale(1); opacity: 0.95; }
+  50% { transform: scale(1.05); opacity: 1; }
+  100% { transform: scale(1); opacity: 0.95; }
+}
+
+/* 折叠状态下的进度角标 */
+.glm-widget-collapsed-badge {
+  position: absolute;
+  top: -6px;
+  right: -6px;
+  background: #10b981 !important;
+  color: #fff !important;
+  font-size: 9px !important;
+  font-weight: 700 !important;
+  padding: 2px 6px !important;
+  border-radius: 10px !important;
+  border: 1px solid rgba(255, 255, 255, 0.2) !important;
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.2) !important;
+}
+
+.glm-widget-collapsed-badge.completed {
+  background: #7c3aed !important;
+}
+
+.glm-widget-progress {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.glm-progress-text {
+  font-size: 11px !important;
+  color: #94a3b8 !important;
+  display: flex;
+  justify-content: space-between;
+}
+
+.glm-progress-bar-bg {
+  width: 100%;
+  height: 6px;
+  background: rgba(255, 255, 255, 0.1);
+  border-radius: 3px;
+  overflow: hidden;
+}
+
+.glm-progress-bar-fg {
+  height: 100%;
+  width: 0%;
+  background: linear-gradient(90deg, #7c3aed, #2563eb);
+  border-radius: 3px;
+  transition: width 0.3s ease;
+}
+
+.glm-widget-actions {
+  display: flex;
+  gap: 8px;
+}
+
+.glm-widget-btn {
+  flex: 1;
+  padding: 6px 8px !important;
+  font-size: 11px !important;
+  font-weight: 600 !important;
+  border: 1px solid rgba(255, 255, 255, 0.1) !important;
+  background: rgba(255, 255, 255, 0.05) !important;
+  color: #cbd5e1 !important;
+  border-radius: 8px !important;
+  cursor: pointer !important;
+  transition: all 0.2s !important;
+}
+
+.glm-widget-btn:hover {
+  background: rgba(255, 255, 255, 0.12) !important;
+  color: #fff !important;
+  border-color: rgba(255, 255, 255, 0.2) !important;
+}
+
+.glm-widget-btn.active {
+  background: linear-gradient(135deg, #7c3aed, #2563eb) !important;
+  color: #fff !important;
+  border: none !important;
+}
+
+/* =======================================================
+   划词翻译悬浮按钮
+   ======================================================= */
+.glm-float-btn {
+  position: absolute;
+  width: 28px;
+  height: 28px;
+  background: #1e1b4b !important;
+  border: 1px solid rgba(255, 255, 255, 0.15) !important;
+  border-radius: 50% !important;
+  cursor: pointer !important;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.25) !important;
+  z-index: 2000000000 !important;
+  transition: transform 0.15s ease, background-color 0.2s;
+}
+
+.glm-float-btn:hover {
+  transform: scale(1.1);
+  background: #312e81 !important;
+  box-shadow: 0 4px 16px rgba(124, 58, 237, 0.4) !important;
+}
+
+.glm-float-btn img {
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+}
+
+/* =======================================================
+   划词翻译结果气泡卡片 (Bubble)
+   ======================================================= */
+.glm-translation-bubble {
+  position: absolute;
+  width: 320px;
+  max-width: 90vw;
+  background: rgba(15, 23, 42, 0.9) !important;
+  backdrop-filter: blur(12px) !important;
+  border: 1px solid rgba(255, 255, 255, 0.12) !important;
+  border-radius: 14px !important;
+  padding: 14px !important;
+  box-shadow: 0 12px 36px rgba(0, 0, 0, 0.35) !important;
+  z-index: 2000000000 !important;
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif !important;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  animation: glm-fade-in 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+@keyframes glm-fade-in {
+  from { opacity: 0; transform: translateY(4px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+.glm-bubble-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+  padding-bottom: 6px;
+}
+
+.glm-bubble-title {
+  font-size: 11px !important;
+  font-weight: 700 !important;
+  color: #a78bfa !important;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.glm-bubble-close {
+  background: none;
+  border: none;
+  color: #94a3b8;
+  cursor: pointer;
+  font-size: 14px;
+}
+
+.glm-bubble-close:hover {
+  color: #f87171;
+}
+
+.glm-bubble-content {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.glm-bubble-original {
+  font-size: 12px !important;
+  color: #94a3b8 !important;
+  font-style: italic;
+  max-height: 80px;
+  overflow-y: auto;
+  line-height: 1.4;
+}
+
+.glm-bubble-translated {
+  font-size: 13.5px !important;
+  color: #f8fafc !important;
+  line-height: 1.5;
+  font-weight: 400;
+  max-height: 150px;
+  overflow-y: auto;
+  border-top: 1px dashed rgba(255, 255, 255, 0.06);
+  padding-top: 8px;
+}
+
+.glm-bubble-loading {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 12px !important;
+  color: #94a3b8 !important;
+}
+
+.glm-spinner {
+  width: 14px;
+  height: 14px;
+  border: 2px solid rgba(255, 255, 255, 0.2);
+  border-top-color: #a78bfa;
+  border-radius: 50%;
+  animation: glm-spin 0.8s linear infinite;
+}
+
+@keyframes glm-spin {
+  to { transform: rotate(360deg); }
+}
+/* =======================================================
+   翻译 Loading 骨架屏样式与动画
+   ======================================================= */
+.glm-loading-placeholder {
+  display: block !important;
+  height: 14px !important;
+  margin-top: 8px !important;
+  margin-bottom: 10px !important;
+  padding: 0 !important;
+  width: 75% !important;
+  border-radius: 4px !important;
+  background: linear-gradient(
+    90deg,
+    rgba(124, 58, 237, 0.04) 25%,
+    rgba(124, 58, 237, 0.12) 50%,
+    rgba(124, 58, 237, 0.04) 75%
+  ) !important;
+  background-size: 200% 100% !important;
+  animation: glm-skeleton-shimmer 1.6s infinite linear !important;
+  box-sizing: border-box !important;
+}
+
+@keyframes glm-skeleton-shimmer {
+  0% {
+    background-position: 200% 0;
+  }
+  100% {
+    background-position: -200% 0;
+  }
+}
+
+/* =======================================================
+   划词翻译气泡内的动作区域与复制按钮
+   ======================================================= */
+.glm-bubble-actions {
+  display: flex !important;
+  align-items: center !important;
+  gap: 8px !important;
+}
+
+.glm-bubble-copy {
+  background: none !important;
+  border: none !important;
+  color: #94a3b8 !important;
+  cursor: pointer !important;
+  font-size: 13px !important;
+  padding: 2px !important;
+  border-radius: 4px !important;
+  transition: all 0.2s !important;
+  display: flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+}
+
+.glm-bubble-copy:hover {
+  color: #a78bfa !important;
+  background: rgba(255, 255, 255, 0.08) !important;
+  transform: scale(1.1);
+}
