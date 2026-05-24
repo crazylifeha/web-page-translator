@@ -2,9 +2,9 @@
 
 **最后更新 / Last updated:** 2026-05-24
 
-本隐私政策适用于浏览器扩展「网页智能翻译」（Web Page Translator，以下简称「本扩展」）。
+本隐私政策适用于浏览器扩展「网页翻译」（Web Page Translator，以下简称「本扩展」）。
 
-This privacy policy applies to the browser extension "Web Page Translator" (网页智能翻译).
+This privacy policy applies to the browser extension "Web Page Translator" (网页翻译).
 
 ---
 
