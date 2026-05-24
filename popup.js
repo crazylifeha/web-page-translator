@@ -1,4 +1,4 @@
-// GLM Web Translator Popup Logic
+// Web Page Translator - popup
 
 document.addEventListener('DOMContentLoaded', () => {
   // DOM 元素引用
@@ -14,14 +14,11 @@ document.addEventListener('DOMContentLoaded', () => {
   const btnTranslate = document.getElementById('btn-translate');
   const btnRestore = document.getElementById('btn-restore');
   const colorDots = document.querySelectorAll('.color-dot');
-  const apiErrorMsg = document.getElementById('api-error-msg'); // 报错原因容器
+  const apiErrorMsg = document.getElementById('api-error-msg');
   const translateEngineSelect = document.getElementById('translate-engine');
   const zhipuConfigSection = document.getElementById('zhipu-config-section');
   const modelDetectedInfo = document.getElementById('model-detected-info');
-  const detectedModelText = document.getElementById('detected-model-text');
-
-  // 本地大模型 DOM 元素引用
-  const localLlmConfigSection = document.getElementById('local-llm-config-section');
+  const detectedModelText = document.getElementById('detected-model-text');  const localLlmConfigSection = document.getElementById('local-llm-config-section');
   const localApiUrlInput = document.getElementById('local-api-url');
   const localApiKeyInput = document.getElementById('local-api-key');
   const localToggleVisibleBtn = document.getElementById('local-toggle-visible');
@@ -29,10 +26,7 @@ document.addEventListener('DOMContentLoaded', () => {
   const localApiErrorMsg = document.getElementById('local-api-error-msg');
   const localModelContainer = document.getElementById('local-model-container');
 
-  let selectedColor = '#7c3aed'; // 默认紫色
-
-  // 展示/隐藏识别到的模型型号
-  function showModelDetectedInfo(text) {
+  let selectedColor = '#7c3aed';  function showModelDetectedInfo(text) {
     if (modelDetectedInfo && detectedModelText) {
       detectedModelText.textContent = `检测到模型：${text}`;
       modelDetectedInfo.style.display = 'flex';
@@ -43,26 +37,17 @@ document.addEventListener('DOMContentLoaded', () => {
     if (modelDetectedInfo) {
       modelDetectedInfo.style.display = 'none';
     }
-  }
-
-  // 控制翻译引擎配置区域显隐
-  function toggleEngineConfigUI(engine) {
-    if (!zhipuConfigSection || !localLlmConfigSection) return;
-    
-    // 默认隐藏所有配置区
-    zhipuConfigSection.classList.add('card-hidden');
+  }  function toggleEngineConfigUI(engine) {
+    if (!zhipuConfigSection || !localLlmConfigSection) return;    zhipuConfigSection.classList.add('card-hidden');
     localLlmConfigSection.classList.add('card-hidden');
     
     if (engine === 'zhipu') {
       zhipuConfigSection.classList.remove('card-hidden');
     } else if (engine === 'local-llm') {
       localLlmConfigSection.classList.remove('card-hidden');
-      checkLocalLlmConnection(); // 切换时立刻检测本地模型
+      checkLocalLlmConnection();
     }
-  }
-
-  // 1. 初始化加载配置
-  chrome.storage.local.get(['apiKey', 'sourceLang', 'targetLang', 'displayMode', 'translatedColor', 'enableSelectionTranslate', 'shortcutTrigger', 'translateEngine', 'detectedModel', 'localApiUrl', 'localModelName', 'localApiKey'], (res) => {
+  }  chrome.storage.local.get(['apiKey', 'sourceLang', 'targetLang', 'displayMode', 'translatedColor', 'enableSelectionTranslate', 'shortcutTrigger', 'translateEngine', 'detectedModel', 'localApiUrl', 'localModelName', 'localApiKey'], (res) => {
     // 默认翻译引擎为 zhipu
     const activeEngine = res.translateEngine || 'zhipu';
     if (translateEngineSelect) translateEngineSelect.value = activeEngine;
@@ -92,18 +77,12 @@ document.addEventListener('DOMContentLoaded', () => {
     if (activeEngine === 'local-llm') {
       checkLocalLlmConnection();
     } else {
-      renderLocalModelInput(); // 默认显示输入框格式
+      renderLocalModelInput();
     }
 
     if (res.sourceLang) sourceLangSelect.value = res.sourceLang;
     if (res.targetLang) targetLangSelect.value = res.targetLang;
-    if (res.displayMode) displayModeSelect.value = res.displayMode;
-    
-    // 默认开启划词翻译 (undefined 也视为 true 开启)
-    enableSelectionTranslateInput.checked = res.enableSelectionTranslate !== false;
-
-    // 默认快捷键 Alt+C
-    const shortcutVal = res.shortcutTrigger || 'Alt+C';
+    if (res.displayMode) displayModeSelect.value = res.displayMode;    enableSelectionTranslateInput.checked = res.enableSelectionTranslate !== false;    const shortcutVal = res.shortcutTrigger || 'Alt+C';
     shortcutInput.value = shortcutVal;
     updateShortcutGuideDisplay(shortcutVal);
     
@@ -147,18 +126,13 @@ document.addEventListener('DOMContentLoaded', () => {
         });
       }
     });
-  });
-
-  // 2. API Key 验证函数
-  function verifyApiKey(key) {
+  });  function verifyApiKey(key) {
     if (!key) {
       updateStatusBadge('unset');
       return;
     }
     updateStatusBadge('checking');
-    chrome.runtime.sendMessage({ action: 'verify_key', apiKey: key }, (response) => {
-      // 处理由于 background 断开导致的 undefined 错误
-      if (chrome.runtime.lastError) {
+    chrome.runtime.sendMessage({ action: 'verify_key', apiKey: key }, (response) => {      if (chrome.runtime.lastError) {
         updateStatusBadge('invalid', '无法与后台校验服务通信');
         return;
       }
@@ -173,14 +147,8 @@ document.addEventListener('DOMContentLoaded', () => {
         updateStatusBadge('invalid', `${statusDetail}${errorDetail}`);
       }
     });
-  }
-
-  // 更新 API 状态标签的显示样式
-  function updateStatusBadge(status, reason = '') {
-    apiStatusBadge.className = 'status-badge';
-    
-    // 默认清除并隐藏报错详情
-    if (apiErrorMsg) {
+  }  function updateStatusBadge(status, reason = '') {
+    apiStatusBadge.className = 'status-badge';    if (apiErrorMsg) {
       apiErrorMsg.style.display = 'none';
       apiErrorMsg.textContent = '';
     }
@@ -200,18 +168,12 @@ document.addEventListener('DOMContentLoaded', () => {
       apiStatusBadge.textContent = '无效';
       apiStatusBadge.classList.add('status-invalid');
       chrome.storage.local.remove('detectedModel');
-      hideModelDetectedInfo();
-      
-      // 展示具体报错原因
-      if (apiErrorMsg && reason) {
+      hideModelDetectedInfo();      if (apiErrorMsg && reason) {
         apiErrorMsg.textContent = reason;
         apiErrorMsg.style.display = 'block';
       }
     }
-  }
-
-  // --- 本地大模型连接检测与模型下拉列表动态加载 ---
-  function checkLocalLlmConnection() {
+  }  function checkLocalLlmConnection() {
     if (!localApiUrlInput) return;
     const url = localApiUrlInput.value.trim();
     const apiKey = localApiKeyInput ? localApiKeyInput.value.trim() : '';
@@ -405,10 +367,7 @@ document.addEventListener('DOMContentLoaded', () => {
         refreshBtn.addEventListener('click', checkLocalLlmConnection);
       }
     });
-  }
-
-  // 3. 事件监听：API Key 输入与验证
-  let verifyTimeout;
+  }  let verifyTimeout;
   apiKeyInput.addEventListener('input', (e) => {
     const key = e.target.value.trim();
     chrome.storage.local.set({ apiKey: key });
@@ -423,16 +382,10 @@ document.addEventListener('DOMContentLoaded', () => {
     verifyTimeout = setTimeout(() => {
       verifyApiKey(key);
     }, 1000);
-  });
-
-  // 密码显示/隐藏切换
-  toggleVisibleBtn.addEventListener('click', () => {
+  });  toggleVisibleBtn.addEventListener('click', () => {
     const type = apiKeyInput.getAttribute('type') === 'password' ? 'text' : 'password';
     apiKeyInput.setAttribute('type', type);
-  });
-
-  // 本地大模型设置事件监听与防抖连通性测试
-  let localVerifyTimeout;
+  });  let localVerifyTimeout;
   const triggerLocalConnectionCheck = () => {
     clearTimeout(localVerifyTimeout);
     updateLocalStatus('checking');
@@ -462,10 +415,7 @@ document.addEventListener('DOMContentLoaded', () => {
       const type = localApiKeyInput.getAttribute('type') === 'password' ? 'text' : 'password';
       localApiKeyInput.setAttribute('type', type);
     });
-  }
-
-  // 4. 保存语言和展示模式设置
-  sourceLangSelect.addEventListener('change', (e) => {
+  }  sourceLangSelect.addEventListener('change', (e) => {
     chrome.storage.local.set({ sourceLang: e.target.value });
   });
 
@@ -475,24 +425,15 @@ document.addEventListener('DOMContentLoaded', () => {
 
   displayModeSelect.addEventListener('change', (e) => {
     chrome.storage.local.set({ displayMode: e.target.value });
-  });
-
-  // 保存划词翻译开关状态
-  enableSelectionTranslateInput.addEventListener('change', (e) => {
+  });  enableSelectionTranslateInput.addEventListener('change', (e) => {
     chrome.storage.local.set({ enableSelectionTranslate: e.target.checked });
-  });
-
-  // 保存翻译引擎设置并切换配置UI
-  if (translateEngineSelect) {
+  });  if (translateEngineSelect) {
     translateEngineSelect.addEventListener('change', (e) => {
       const engine = e.target.value;
       chrome.storage.local.set({ translateEngine: engine });
       toggleEngineConfigUI(engine);
     });
-  }
-
-  // 4.6. 快捷键录制逻辑
-  let isRecording = false;
+  }  let isRecording = false;
 
   shortcutInput.addEventListener('focus', () => {
     isRecording = true;
@@ -561,11 +502,8 @@ document.addEventListener('DOMContentLoaded', () => {
     chrome.storage.local.set({ shortcutTrigger: defaultValue });
     updateShortcutGuideDisplay(defaultValue);
     syncShortcutToCurrentTab(defaultValue);
-  });
-
-  // 5. 译文颜色点选择器
-  colorDots.forEach(dot => {
-    if (!dot.hasAttribute('data-color')) return; // 跳过自定义拾色器圆点
+  });  colorDots.forEach(dot => {
+    if (!dot.hasAttribute('data-color')) return;
 
     dot.addEventListener('click', () => {
       colorDots.forEach(d => d.classList.remove('active'));
@@ -592,10 +530,7 @@ document.addEventListener('DOMContentLoaded', () => {
         }
       });
     });
-  });
-
-  // 自定义颜色拾色器事件处理
-  const customColorPicker = document.getElementById('custom-color-picker');
+  });  const customColorPicker = document.getElementById('custom-color-picker');
   const customColorBtn = document.getElementById('custom-color-btn');
   if (customColorPicker && customColorBtn) {
     // 点击自定义圆点按钮时触发原生的颜色拾色器
@@ -632,10 +567,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
     customColorPicker.addEventListener('input', handleCustomColorChange);
     customColorPicker.addEventListener('change', handleCustomColorChange);
-  }
-
-  // 获取当前所有设置参数的辅助函数
-  function getSettings(callback) {
+  }  function getSettings(callback) {
     chrome.storage.local.get(['apiKey', 'sourceLang', 'targetLang', 'displayMode', 'translatedColor', 'translateEngine', 'localApiUrl', 'localModelName', 'localApiKey'], (res) => {
       callback({
         apiKey: res.apiKey || '',
@@ -649,28 +581,19 @@ document.addEventListener('DOMContentLoaded', () => {
         localApiKey: res.localApiKey || ''
       });
     });
-  }
-
-  // 辅助函数：将“翻译当前页面”按钮设为“正在翻译”状态
-  function setTranslatingButtonState() {
+  }  function setTranslatingButtonState() {
     btnTranslate.disabled = true;
     btnTranslate.textContent = '正在翻译中...';
     btnTranslate.style.background = 'rgba(255, 255, 255, 0.15)';
     btnTranslate.style.cursor = 'not-allowed';
     btnTranslate.style.boxShadow = 'none';
-  }
-
-  // 辅助函数：恢复“翻译当前页面”按钮为可用状态
-  function restoreTranslateButtonState() {
+  }  function restoreTranslateButtonState() {
     btnTranslate.disabled = false;
     btnTranslate.textContent = '翻译当前页面';
-    btnTranslate.style.background = ''; // 恢复 CSS 的背景渐变
+    btnTranslate.style.background = '';
     btnTranslate.style.cursor = '';
     btnTranslate.style.boxShadow = '';
-  }
-
-  // 6. 翻译当前页面
-  btnTranslate.addEventListener('click', () => {
+  }  btnTranslate.addEventListener('click', () => {
     getSettings((settings) => {
       if (settings.translateEngine === 'zhipu' && !settings.apiKey) {
         alert('请先输入有效的大模型 API Key！');
@@ -701,10 +624,7 @@ document.addEventListener('DOMContentLoaded', () => {
         });
       });
     });
-  });
-
-  // 7. 恢复网页原文
-  btnRestore.addEventListener('click', () => {
+  });  btnRestore.addEventListener('click', () => {
     chrome.tabs.query({ active: true, currentWindow: true }, (tabs) => {
       if (!tabs[0] || !tabs[0].id) return;
       chrome.tabs.sendMessage(tabs[0].id, { action: 'restore_page' }, (response) => {
@@ -716,18 +636,12 @@ document.addEventListener('DOMContentLoaded', () => {
         }
       });
     });
-  });
-
-  // 更新面板底部的快捷键指南展示
-  function updateShortcutGuideDisplay(shortcut) {
+  });  function updateShortcutGuideDisplay(shortcut) {
     const guideKeyEl = document.getElementById('guide-shortcut-key-web');
     if (guideKeyEl) {
       guideKeyEl.textContent = shortcut;
     }
-  }
-
-  // 同步新快捷键设定到当前打开的标签页（使之立即生效而不需要手动刷新）
-  function syncShortcutToCurrentTab(shortcut) {
+  }  function syncShortcutToCurrentTab(shortcut) {
     chrome.tabs.query({ active: true, currentWindow: true }, (tabs) => {
       if (tabs[0] && tabs[0].id) {
         chrome.tabs.sendMessage(tabs[0].id, {

@@ -1,4 +1,4 @@
-/* GLM Web Translator Popup Style */
+/* Web Page Translator - popup */
 :root {
   --bg-gradient: linear-gradient(135deg, #0f172a 0%, #1e1b4b 100%);
   --card-bg: rgba(30, 41, 59, 0.7);
@@ -43,7 +43,7 @@ body {
   gap: 10px; /* 稍微压缩卡片间隔 */
 }
 
-/* 滚动条定制，打造 premium 质感 */
+/* 滚动条定制，打造  */
 .scroll-content::-webkit-scrollbar {
   width: 6px;
 }
@@ -592,7 +592,7 @@ input:checked + .slider:before {
   word-break: break-all !important;
 }
 
-/* 免 Key 提示及隐藏配置区域样式 */
+/* 隐藏配置区域样式 */
 .card-hidden {
   display: none !important;
 }
@@ -644,7 +644,7 @@ input:checked + .slider:before {
   gap: 8px;
 }
 
-/* 模型识别提示区域样式，科技感高级感 */
+/* 模型识别提示区域样式， */
 .model-detected-info {
   font-size: 11px !important;
   color: #a78bfa !important; 

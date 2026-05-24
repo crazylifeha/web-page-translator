@@ -1,8 +1,8 @@
 {
   "manifest_version": 3,
-  "name": "网页智能翻译",
+  "name": "网页翻译",
   "version": "1.0.0",
-  "description": "一款支持多引擎接入的智能网页对照翻译插件框架。",
+  "description": "支持本地大模型、公式保留与双语对照的网页翻译扩展。",
   "permissions": [
     "storage",
     "contextMenus"

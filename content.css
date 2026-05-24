@@ -1,4 +1,4 @@
-/* GLM Translator Content Injection Styles */
+/* Web Page Translator - content injection */
 
 :root {
   --glm-translate-color: #7c3aed;
@@ -18,7 +18,7 @@
   overflow: hidden !important;
 }
 
-/* 终极兜底：若翻译元素内部完全没有子节点内容，强制隐藏，杜绝空紫色条 */
+/* 若翻译元素内部完全没有子节点内容，强制隐藏，杜绝空紫色条 */
 .glm-translated:empty {
   display: none !important;
 }
@@ -84,9 +84,6 @@ body.glm-mode-original-only .glm-translated {
 }
 
 
-/* =======================================================
-   右下角悬浮控制条 (Widget)
-   ======================================================= */
 .glm-translate-widget {
   position: fixed;
   bottom: 24px;
@@ -298,9 +295,6 @@ body.glm-mode-original-only .glm-translated {
   border: none !important;
 }
 
-/* =======================================================
-   划词翻译悬浮按钮
-   ======================================================= */
 .glm-float-btn {
   position: absolute;
   width: 28px;
@@ -329,9 +323,6 @@ body.glm-mode-original-only .glm-translated {
   border-radius: 50%;
 }
 
-/* =======================================================
-   划词翻译结果气泡卡片 (Bubble)
-   ======================================================= */
 .glm-translation-bubble {
   position: absolute;
   width: 320px;
@@ -429,9 +420,6 @@ body.glm-mode-original-only .glm-translated {
 @keyframes glm-spin {
   to { transform: rotate(360deg); }
 }
-/* =======================================================
-   翻译 Loading 骨架屏样式与动画
-   ======================================================= */
 .glm-loading-placeholder {
   display: block !important;
   height: 14px !important;
@@ -460,9 +448,6 @@ body.glm-mode-original-only .glm-translated {
   }
 }
 
-/* =======================================================
-   划词翻译气泡内的动作区域与复制按钮
-   ======================================================= */
 .glm-bubble-actions {
   display: flex !important;
   align-items: center !important;
