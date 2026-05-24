@@ -54,13 +54,6 @@ A browser extension built for **papers, technical documentation, and complex web
 
 ## 安装 / Installation
 
-### 方式一：从商店安装（推荐）
-
-- Chrome Web Store：*（上架后补充链接）*
-- Microsoft Edge Add-ons：*（上架后补充链接）*
-
-### 方式二：开发者模式加载
-
 1. 克隆或下载本仓库
 2. 打开浏览器扩展管理页
    - Chrome：`chrome://extensions`
@@ -121,17 +114,6 @@ $env:OLLAMA_ORIGINS="*"; ollama serve
 ├── popup.html/js/css  # 扩展弹窗面板
 └── icons/             # 扩展图标
 ```
-
----
-
-## 打包上架 / Packaging for Store
-
-```powershell
-# 在项目根目录打包（确保 zip 内直接是 manifest.json，不要多包一层文件夹）
-Compress-Archive -Path manifest.json, background.js, content.js, content.css, popup.html, popup.js, popup.css, icons -DestinationPath web-translator-v1.0.0.zip -Force
-```
-
-上架前请阅读 [PRIVACY.md](./PRIVACY.md) 并在商店填写隐私政策链接。
 
 ---
 
