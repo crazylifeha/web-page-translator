@@ -5,19 +5,28 @@ let originalBlocks = []; // 存储所有待翻译的节点和原始文本
 let modifiedLayoutElements = []; // 暂存被动态修改了布局样式的元素及其原本 inline 样式
 let translatedBlocksCount = 0;
 let totalBlocksCount = 0;
-let translatedColor = '#7c3aed';
+let translatedColor = '#7c3aed'; // 默认翻译颜色
 let displayMode = 'bilingual'; // bilingual, translation-only, original-only
-let currentShortcut = 'Alt+C';
+let currentShortcut = 'Alt+C'; // 默认触发快捷键
 let lastSelectedText = ''; // 记录上一次划词的原文文本
 let lastSelectionRect = null; // 记录上一次划词的选择区坐标
 let autoMinimizeTimeout = null; // 翻译完成后自动收起面板的定时器
 let domObserver = null; // 网页 DOM 监听器，用于支持滚动动态加载的增量翻译
 let pendingObserveBlocks = []; // 动态扫描到的待翻译积压队列
-let observeTimeout = null; // 增量翻译的防抖定时器chrome.storage.local.get(['shortcutTrigger'], (res) => {
+let observeTimeout = null; // 增量翻译的防抖定时器
+
+// 初始化读取快捷键配置
+chrome.storage.local.get(['shortcutTrigger'], (res) => {
   if (res.shortcutTrigger) {
     currentShortcut = res.shortcutTrigger;
   }
-});const BLOCK_TAGS = ['p', 'h1', 'h2', 'h3', 'h4', 'h5', 'h6', 'blockquote', 'li', 'td', 'th', 'figcaption', 'summary', 'dd', 'dt'];chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
+});
+
+// 标签过滤
+const BLOCK_TAGS = ['p', 'h1', 'h2', 'h3', 'h4', 'h5', 'h6', 'blockquote', 'li', 'td', 'th', 'figcaption', 'summary', 'dd', 'dt'];
+
+// 消息监听：监听来自 popup 或 background 的指令
+chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
   if (request.action === 'start_translation') {
     translatedColor = request.settings.translatedColor;
     displayMode = request.settings.displayMode;
@@ -61,7 +70,10 @@ let observeTimeout = null; // 增量翻译的防抖定时器chrome.storage.loca
     currentShortcut = request.shortcut;
     sendResponse({ success: true });
   }
-});function applyColorCSS(color) {
+});
+
+// 动态设置译文颜色样式
+function applyColorCSS(color) {
   let styleEl = document.getElementById('glm-translate-style');
   if (!styleEl) {
     styleEl = document.createElement('style');
@@ -75,6 +87,10 @@ let observeTimeout = null; // 增量翻译的防抖定时器chrome.storage.loca
     }
   `;
 }
+
+// =======================================================
+// DOM 遍历及解析逻辑
+// =======================================================
 
 function isTranslatable(el) {
   const skipTags = ['script', 'style', 'code', 'pre', 'noscript', 'textarea', 'input', 'select', 'option', 'iframe', 'canvas', 'svg', 'math', 'button', 'noscript', 'annotation', 'semantics'];
@@ -126,7 +142,10 @@ function isTranslatable(el) {
   }
   
   return true;
-}function extractTextAndMath(el) {
+}
+
+// 智能提取 DOM 数学公式节点、超链接以及文本数学公式，并使用占位符保护
+function extractTextAndMath(el) {
   const mathItems = [];
   const linkElements = [];
   
@@ -189,7 +208,13 @@ function isTranslatable(el) {
     }
     
     return '';
-  }  let processedText = traverse(el);  processedText = processedText.replace(/\$\$([\s\S]+?)\$\$/g, (match) => {
+  }
+
+  // 1. 先提取 DOM 中的数学公式节点与超链接
+  let processedText = traverse(el);
+
+  // 2. 再提取残留的文本格式数学公式（如 $x+y$ 或 $$x+y$$）
+  processedText = processedText.replace(/\$\$([\s\S]+?)\$\$/g, (match) => {
     mathItems.push({ type: 'text', value: match });
     return ` [M_${mathItems.length - 1}] `;
   });
@@ -204,18 +229,27 @@ function isTranslatable(el) {
     mathItems: mathItems,
     linkElements: linkElements
   };
-}function isMetadataOrNoise(text) {
+}
+
+// 智能识别并过滤元数据（如纯作者名录、学术邮箱列表、纯链接列表等）
+function isMetadataOrNoise(text) {
   if (!text) return true;
   // 先把 MATH 公式占位符完全移除，避免干扰字数与停用词比例的计算
   const cleanText = text.replace(/\[\s*M_\d+\s*\]/gi, '').trim();
-  if (!cleanText) return true;  const emailRegex = /[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}/g;
+  if (!cleanText) return true;
+  
+  // 1. 如果包含邮箱地址
+  const emailRegex = /[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}/g;
   const emails = cleanText.match(emailRegex);
   if (emails && emails.length >= 1) {
     // 若包含多个邮箱，或虽然只有1个邮箱但整体长度偏短（通常为联系人行），判定为元数据
     if (cleanText.length < 150 || emails.length >= 2) {
       return true;
     }
-  }  const urlRegex = /https?:\/\/[^\s]+/g;
+  }
+  
+  // 2. 如果是纯链接或链接+极少单词
+  const urlRegex = /https?:\/\/[^\s]+/g;
   const urls = cleanText.match(urlRegex);
   const words = cleanText.split(/\s+/).filter(w => w.length > 0);
   if (urls) {
@@ -226,7 +260,10 @@ function isTranslatable(el) {
     if (realWords.length <= 8) {
       return true; // 去掉 URL 后几乎没有实质叙述内容，判定为噪声
     }
-  }  if (words.length > 5) {
+  }
+
+  // 3. 统计英文停用词的比例（叙述性段落必定包含 common stopwords）
+  if (words.length > 5) {
     const stopwords = new Set([
       'the', 'of', 'and', 'to', 'in', 'is', 'a', 'for', 'with', 'that', 'this', 'on', 'as', 'by', 'an', 'we', 'our', 'it', 'its', 'are', 'was', 'were', 'or', 'at', 'from', 'be', 'has', 'have', 'which', 'but', 'not', 'they', 'their', 'you', 'your'
     ]);
@@ -288,7 +325,11 @@ function scanBlocks(element, list) {
       }
     }
 
-    // 过滤规则：    const hasLetters = /[a-zA-Z]/.test(textInfo.text);
+    // 过滤规则：
+    // 1. 提取公式占位符后的纯文本长度大于 8 个字符
+    // 2. 文本中必须含有英文叙述性字母，且去除公式占位符后的叙述文本仍包含字母（防止翻译纯公式或公式+数字编号）
+    // 3. 排除元数据/噪声块（如纯作者名录、邮箱列表等）
+    const hasLetters = /[a-zA-Z]/.test(textInfo.text);
     const narrativeText = textInfo.text.replace(/\[\s*M_\d+\s*\]/gi, '');
     const hasNarrativeLetters = /[a-zA-Z]/.test(narrativeText);
 
@@ -309,6 +350,10 @@ function scanBlocks(element, list) {
     scanBlocks(child, list);
   }
 }
+
+// =======================================================
+// DOM 树动态监听 (MutationObserver) 逻辑，用于增量无限滚动翻译
+// =======================================================
 
 function startObserveDOM() {
   if (domObserver) return;
@@ -392,6 +437,10 @@ function stopObserveDOM() {
   pendingObserveBlocks = [];
 }
 
+// =======================================================
+// 网页整体翻译流程
+// =======================================================
+
 function startPageTranslation(settings) {
   if (isTranslating) {
     // 避免重复运行扫描，只更新显示模式即可
@@ -406,20 +455,37 @@ function startPageTranslation(settings) {
   if (autoMinimizeTimeout) {
     clearTimeout(autoMinimizeTimeout);
     autoMinimizeTimeout = null;
-  }  scanBlocks(document.body, originalBlocks);
+  }
+  
+  // 1. 扫描页面中所有的文本块
+  scanBlocks(document.body, originalBlocks);
   totalBlocksCount = originalBlocks.length;
   
   if (totalBlocksCount === 0) {
     showFloatingToast('未在当前页面检测到可翻译的英文文本。', 'info');
     isTranslating = false;
     return;
-  }  createOrUpdateWidget();  startObserveDOM();  originalBlocks.forEach((item, index) => {
+  }
+
+  // 2. 创建或更新控制面板
+  createOrUpdateWidget();
+
+  // 3. 启动动态 DOM 变动监听（增量翻译）
+  startObserveDOM();
+
+  // 4. 将扫描到的块编入翻译队列
+  originalBlocks.forEach((item, index) => {
     item.id = index;
-  });  // 降低每包大小能确保大模型在 2-3 秒内快速返回译文，达成极其顺畅的渐进式加载体验
+  });
+  // 4. 使用智能自适应算法分批发送翻译请求 (限制单包最多 8 个段落且总字符不超过 1000 字)
+  // 降低每包大小能确保大模型在 2-3 秒内快速返回译文，达成极其顺畅的渐进式加载体验
   const batches = packBlocksIntoBatches(originalBlocks, 8, 1000);
 
   processBatches(batches, settings.sourceLang, settings.targetLang, settings.translateEngine);
-}function packBlocksIntoBatches(blocks, maxCount = 50, maxCharLength = 5000) {
+}
+
+// 智能自适应打包函数
+function packBlocksIntoBatches(blocks, maxCount = 50, maxCharLength = 5000) {
   const batches = [];
   let currentBatch = [];
   let currentChars = 0;
@@ -455,7 +521,10 @@ async function processBatches(batches, sourceLang, targetLang, translateEngine) 
 
   async function runNext() {
     if (index >= batches.length || !isTranslating) return;
-    const currentBatch = batches[index++];    currentBatch.forEach(b => {
+    const currentBatch = batches[index++];
+    
+    // 1. 发送前为本批次所有段落显示 Loading 骨架屏
+    currentBatch.forEach(b => {
       insertLoadingSkeleton(b.element, b.id);
     });
     
@@ -470,12 +539,16 @@ async function processBatches(batches, sourceLang, targetLang, translateEngine) 
       if (response && response.success && response.results) {
         insertTranslations(response.results, currentBatch);
       } else {
-        console.error('分批翻译失败:', response ? response.error : '未知错误');        currentBatch.forEach(b => {
+        console.error('分批翻译失败:', response ? response.error : '未知错误');
+        // 2. 失败时清除 Loading 骨架屏
+        currentBatch.forEach(b => {
           removeLoadingSkeleton(b.element, b.id);
         });
       }
     } catch (err) {
-      console.error('API 发送出错:', err);      currentBatch.forEach(b => {
+      console.error('API 发送出错:', err);
+      // 3. 出错时清除 Loading 骨架屏
+      currentBatch.forEach(b => {
         removeLoadingSkeleton(b.element, b.id);
       });
     } finally {
@@ -543,6 +616,10 @@ function removeLoadingSkeleton(originalEl, id) {
     loader.remove();
   }
 }
+
+// =======================================================
+// 译文渲染与插入
+// =======================================================
 
 function insertTranslations(results, batch) {
   if (!results || typeof results !== 'object') return;
@@ -631,7 +708,10 @@ function insertTranslations(results, batch) {
 
   // 刷新当前页面所处的隐藏/显示模式
   updateDisplayMode(displayMode);
-}function syncOriginalStyle(originalEl, transEl) {
+}
+
+// 辅助样式同步函数：同步原文的居中对齐、字号大小与粗细，保证译文排版与原文百分百一致
+function syncOriginalStyle(originalEl, transEl) {
   if (!originalEl || !transEl) return;
   try {
     const origStyle = window.getComputedStyle(originalEl);
@@ -645,7 +725,10 @@ function insertTranslations(results, batch) {
   } catch (e) {
     console.warn('样式同步失败:', e);
   }
-}// 注意：只做最保守的调整（白空间折行和小固定高度容器），绝不修改 overflow 和 position，以免破坏页面原有的宽度约束布局
+}
+
+// 智能自适应父容器高度/折行宽容逻辑，解决特殊容器截断译文的问题
+// 注意：只做最保守的调整（白空间折行和小固定高度容器），绝不修改 overflow 和 position，以免破坏页面原有的宽度约束布局
 function adjustParentLayout(element) {
   if (!element) return;
   let current = element.parentElement;
@@ -656,11 +739,17 @@ function adjustParentLayout(element) {
     try {
       const computedStyle = window.getComputedStyle(current);
       let needsAdjustment = false;
-      const originalStyles = {};      if (computedStyle.whiteSpace === 'nowrap') {
+      const originalStyles = {};
+      
+      // 1. 允许折行（解决 white-space: nowrap 导致文本横向溢出不换行的问题）
+      if (computedStyle.whiteSpace === 'nowrap') {
         originalStyles.whiteSpace = current.style.whiteSpace;
         current.style.setProperty('white-space', 'normal', 'important');
         needsAdjustment = true;
-      }      const rawHeight = computedStyle.height;
+      }
+      
+      // 2. 放宽固定高度限制（仅针对 < 120px 的小固定高度容器，如通知横幅、导航条等）
+      const rawHeight = computedStyle.height;
       const heightPx = parseFloat(rawHeight);
       if (!isNaN(heightPx) && heightPx > 0 && heightPx < 120) {
         // 确认该高度确实是固定设定的（行内样式 / CSS 类），而非自然撑开的内容高度
@@ -678,7 +767,10 @@ function adjustParentLayout(element) {
             current.style.setProperty('overflow-y', 'visible', 'important');
           }
         }
-      }      const maxHeightVal = computedStyle.maxHeight;
+      }
+      
+      // 3. 移除过小的最大高度限制（仅 < 120px 且确认有内容被截断时才调整）
+      const maxHeightVal = computedStyle.maxHeight;
       if (maxHeightVal && maxHeightVal !== 'none') {
         const maxHeightPx = parseFloat(maxHeightVal);
         if (!isNaN(maxHeightPx) && maxHeightPx < 120 && current.scrollHeight > current.clientHeight + 2) {
@@ -710,7 +802,12 @@ function adjustParentLayout(element) {
     current = current.parentElement;
     depth++;
   }
-}function renderTranslationContent(containerEl, translatedText, mathItems, linkElements) {  if (translatedText) {
+}
+
+// 辅助渲染函数：将翻译文本解析并混合插入 DOM 公式节点、超链接与文本公式
+function renderTranslationContent(containerEl, translatedText, mathItems, linkElements) {
+  // 1. 容错预处理：将大模型汉化或畸变的占位符高可靠还原为标准英文占位符
+  if (translatedText) {
     translatedText = translatedText.replace(/\[\s*(公式|数学|math|m)_?(\d+)\s*\]/gi, ' [M_$2] ');
   }
 
@@ -780,7 +877,10 @@ function restorePage() {
   // 停止动态 DOM 监听并清理标记
   stopObserveDOM();
   const scannedEls = document.querySelectorAll('[data-glm-scanned]');
-  scannedEls.forEach(el => el.removeAttribute('data-glm-scanned'));  const inlineEls = document.querySelectorAll('[data-glm-inline]');
+  scannedEls.forEach(el => el.removeAttribute('data-glm-scanned'));
+  
+  // 1. 先解包 li/td/th 中的原文包裹 span（将子节点移回父元素），恢复原始 DOM 结构
+  const inlineEls = document.querySelectorAll('[data-glm-inline]');
   inlineEls.forEach(el => {
     const wrapper = el.querySelector('.glm-original-content');
     if (wrapper) {
@@ -791,10 +891,25 @@ function restorePage() {
       wrapper.remove();
     }
     el.removeAttribute('data-glm-inline');
-  });  const transEls = document.querySelectorAll('.glm-translated[data-glm-translated="true"]');
-  transEls.forEach(el => el.remove());  const origEls = document.querySelectorAll('[data-glm-id]');
-  origEls.forEach(el => el.removeAttribute('data-glm-id'));  document.body.classList.remove('glm-mode-translation-only', 'glm-mode-original-only', 'glm-mode-bilingual');  const widget = document.getElementById('glm-widget');
-  if (widget) widget.remove();  modifiedLayoutElements.forEach(item => {
+  });
+
+  // 2. 清理译文元素
+  const transEls = document.querySelectorAll('.glm-translated[data-glm-translated="true"]');
+  transEls.forEach(el => el.remove());
+
+  // 3. 清除原文的 data 标识
+  const origEls = document.querySelectorAll('[data-glm-id]');
+  origEls.forEach(el => el.removeAttribute('data-glm-id'));
+
+  // 4. 清理 body 样式模式类
+  document.body.classList.remove('glm-mode-translation-only', 'glm-mode-original-only', 'glm-mode-bilingual');
+
+  // 5. 清除控制面板
+  const widget = document.getElementById('glm-widget');
+  if (widget) widget.remove();
+
+  // 6. 还原被动态修改了布局样式的父级元素样式
+  modifiedLayoutElements.forEach(item => {
     try {
       const el = item.element;
       for (const prop in item.originalStyles) {
@@ -806,7 +921,10 @@ function restorePage() {
     }
   });
   modifiedLayoutElements = [];
-}function updateDisplayMode(mode) {
+}
+
+// 更新显示模式（双语对照/仅显示译文/仅显示原文）
+function updateDisplayMode(mode) {
   displayMode = mode;
   document.body.classList.remove('glm-mode-translation-only', 'glm-mode-original-only', 'glm-mode-bilingual');
   
@@ -818,6 +936,10 @@ function restorePage() {
     document.body.classList.add('glm-mode-bilingual');
   }
 }
+
+// =======================================================
+// 网页右下角控制条 Widget
+// =======================================================
 
 function createOrUpdateWidget() {
   let widget = document.getElementById('glm-widget');
@@ -993,7 +1115,9 @@ function createOrUpdateWidget() {
 
         // 仅当用户手动拖拽过或者应用了自定义位置时，才需要计算防溢出的像素级 left/top 坐标
         // 否则直接交由 CSS 处理，默认使用 right: 24px; bottom: 24px; 自动向上展开，绝不会截断
-        if (widget.style.left && widget.style.left !== 'auto') {          const origVisibility = widget.style.visibility;
+        if (widget.style.left && widget.style.left !== 'auto') {
+          // 1. 暂时移除 minimized 并加入 dragging 以彻底禁用 transition 动画，进行真实尺寸测量
+          const origVisibility = widget.style.visibility;
           widget.style.visibility = 'hidden';
           widget.classList.add('dragging');
           widget.classList.remove('minimized');
@@ -1004,7 +1128,10 @@ function createOrUpdateWidget() {
           // 恢复 minimized 和 dragging
           widget.classList.add('minimized');
           widget.classList.remove('dragging');
-          widget.style.visibility = origVisibility;          const rect = widget.getBoundingClientRect();
+          widget.style.visibility = origVisibility;
+
+          // 2. 获取折叠小球当前的 left 和 top 坐标
+          const rect = widget.getBoundingClientRect();
           const currentLeft = rect.left;
           const currentTop = rect.top;
           
@@ -1019,7 +1146,10 @@ function createOrUpdateWidget() {
           }
           if (targetTop > maxTop) {
             targetTop = maxTop; // 若展开后会超出底边缘，提前向上平移
-          }          widget.style.left = `${Math.max(16, targetLeft)}px`;
+          }
+
+          // 3. 立即将防溢出的安全坐标应用到 widget 上，然后再移除 minimized 触发平滑过渡
+          widget.style.left = `${Math.max(16, targetLeft)}px`;
           widget.style.top = `${Math.max(16, targetTop)}px`;
         }
 
@@ -1114,6 +1244,10 @@ function updateWidgetProgress() {
     }
   }
 }
+
+// =======================================================
+// 划词翻译 (Floating Button & Bubble)
+// =======================================================
 
 let floatBtn = null;
 let translationBubble = null;
@@ -1343,7 +1477,10 @@ function removeFloatElements() {
     translationBubble.remove();
     translationBubble = null;
   }
-}function showFloatingToast(message, type = 'info') {
+}
+
+// 辅助函数：显示全局轻吐司 (Toast)
+function showFloatingToast(message, type = 'info') {
   let toast = document.createElement('div');
   toast.className = 'glm-toast';
   toast.style.cssText = `
@@ -1376,7 +1513,7 @@ function removeFloatElements() {
   }, 3000);
 }
 
-// HTML 转义，避免 XSS
+// 辅助 HTML 转义函数，避免 XSS
 function escapeHtml(text) {
   if (!text) return '';
   return text
@@ -1385,7 +1522,10 @@ function escapeHtml(text) {
     .replace(/>/g, "&gt;")
     .replace(/"/g, "&quot;")
     .replace(/'/g, "&#039;");
-}function matchShortcut(e, shortcutStr) {
+}
+
+// 8. 键盘快捷键匹配辅助函数
+function matchShortcut(e, shortcutStr) {
   if (!shortcutStr) return false;
   
   const parts = shortcutStr.split('+').map(p => p.trim().toLowerCase());
@@ -1413,7 +1553,10 @@ function escapeHtml(text) {
   }
   
   return ctrlMatch && altMatch && shiftMatch && metaMatch && keyMatch;
-}document.addEventListener('keydown', (e) => {
+}
+
+// 9. 键盘快捷键监听：触发翻译与恢复网页
+document.addEventListener('keydown', (e) => {
   // 如果当前焦点在输入框、文本域中，则不触发快捷键
   const activeEl = document.activeElement;
   if (activeEl && (['input', 'textarea', 'select'].includes(activeEl.tagName.toLowerCase()) || activeEl.isContentEditable)) {
