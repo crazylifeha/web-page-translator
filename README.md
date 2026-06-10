@@ -26,6 +26,9 @@ A browser extension built for **papers, technical documentation, and complex web
 - **整页翻译 + 划词翻译，多场景覆盖**  
   既适合通读整篇文章，也适合快速查句、查段落、查选中内容。
 
+- **智能内容识别，只翻正文不翻界面**  
+  自动跳过导航栏、按钮、链接标题、commit 消息等 UI 控件，专注于正文段落的翻译，在 GitHub、文档站等复杂页面上不破坏原有布局。
+
 ## 功能特性 / Features
 
 - **整页翻译** — 识别段落、标题、列表等块级元素，批量翻译并原位展示
@@ -34,6 +37,8 @@ A browser extension built for **papers, technical documentation, and complex web
 - **多引擎支持** — 大模型 API、本地大模型、谷歌翻译、微软翻译
 - **公式保护** — 自动保留 LaTeX、MathJax、KaTeX 与文本公式占位符
 - **动态页面翻译** — 支持滚动加载内容的增量翻译
+- **不破坏页面布局** — 译文以子元素方式注入，不影响父容器的 flex/grid 排版
+- **UI 过滤** — 自动识别并跳过导航区域、链接按钮、低信息密度的 UI 文本
 - **一键恢复原文** — 随时回退，不破坏原始阅读流程
 - **自定义体验** — 支持快捷键、译文颜色等个性化配置
 
