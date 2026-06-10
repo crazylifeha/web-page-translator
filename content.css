@@ -46,15 +46,15 @@ h1.glm-translated, h2.glm-translated, h3.glm-translated, h4.glm-translated, h5.g
   box-sizing: border-box !important;
 }
 
-/* 行内译文样式 */
+/* 子元素模式译文样式（p/h1~h6/div/blockquote 等均用 span 插入，避免破坏父容器 flex/grid 布局） */
 span.glm-translated {
-  display: inline-block !important;
-  margin-left: 4px;
-  margin-right: 4px;
-  padding: 2px 6px !important;
+  display: block !important;
+  margin-top: 8px !important;
+  margin-bottom: 10px !important;
+  padding: 8px 12px !important;
   background-color: var(--glm-translate-bg) !important;
-  border-radius: 4px !important;
-  border-bottom: 1px dashed var(--glm-translate-color) !important;
+  border-radius: 8px !important;
+  box-sizing: border-box !important;
 }
 
 /* 列表项译文样式 */
@@ -65,6 +65,131 @@ li.glm-translated {
   background-color: var(--glm-translate-bg) !important;
   border-radius: 6px !important;
   box-sizing: border-box !important;
+}
+
+/* =======================================================
+   译文显示主题样式覆盖（高亮、纯文字、虚线下划线、斜体弱化）
+   ======================================================= */
+
+/* 背景高亮 (默认)：应用背景色与内边距 */
+body.glm-style-highlight .glm-translated {
+  background-color: var(--glm-translate-bg) !important;
+}
+
+/* 纯文字、下划线、斜体以及模糊遮罩、透明度弱化、引用线模式下：重置所有背景与圆角，并强制应用译文颜色 */
+body.glm-style-text-only .glm-translated,
+body.glm-style-dotted .glm-translated,
+body.glm-style-italic .glm-translated,
+body.glm-style-mask .glm-translated,
+body.glm-style-weakening .glm-translated,
+body.glm-style-blockquote .glm-translated {
+  background-color: transparent !important;
+  border-radius: 0 !important;
+  color: var(--glm-translate-color) !important;
+}
+
+body.glm-style-text-only p.glm-translated,
+body.glm-style-text-only div.glm-translated,
+body.glm-style-text-only h1.glm-translated,
+body.glm-style-text-only h2.glm-translated,
+body.glm-style-text-only h3.glm-translated,
+body.glm-style-text-only h4.glm-translated,
+body.glm-style-text-only h5.glm-translated,
+body.glm-style-text-only h6.glm-translated,
+body.glm-style-text-only li.glm-translated,
+body.glm-style-dotted p.glm-translated,
+body.glm-style-dotted div.glm-translated,
+body.glm-style-dotted h1.glm-translated,
+body.glm-style-dotted h2.glm-translated,
+body.glm-style-dotted h3.glm-translated,
+body.glm-style-dotted h4.glm-translated,
+body.glm-style-dotted h5.glm-translated,
+body.glm-style-dotted h6.glm-translated,
+body.glm-style-dotted li.glm-translated,
+body.glm-style-italic p.glm-translated,
+body.glm-style-italic div.glm-translated,
+body.glm-style-italic h1.glm-translated,
+body.glm-style-italic h2.glm-translated,
+body.glm-style-italic h3.glm-translated,
+body.glm-style-italic h4.glm-translated,
+body.glm-style-italic h5.glm-translated,
+body.glm-style-italic h6.glm-translated,
+body.glm-style-italic li.glm-translated,
+body.glm-style-mask p.glm-translated,
+body.glm-style-mask div.glm-translated,
+body.glm-style-mask h1.glm-translated,
+body.glm-style-mask h2.glm-translated,
+body.glm-style-mask h3.glm-translated,
+body.glm-style-mask h4.glm-translated,
+body.glm-style-mask h5.glm-translated,
+body.glm-style-mask h6.glm-translated,
+body.glm-style-mask li.glm-translated,
+body.glm-style-weakening p.glm-translated,
+body.glm-style-weakening div.glm-translated,
+body.glm-style-weakening h1.glm-translated,
+body.glm-style-weakening h2.glm-translated,
+body.glm-style-weakening h3.glm-translated,
+body.glm-style-weakening h4.glm-translated,
+body.glm-style-weakening h5.glm-translated,
+body.glm-style-weakening h6.glm-translated,
+body.glm-style-weakening li.glm-translated {
+  padding: 4px 0 !important;
+  margin-top: 4px !important;
+  margin-bottom: 6px !important;
+}
+
+/* 引用线模式的独立内衬样式 */
+body.glm-style-blockquote p.glm-translated,
+body.glm-style-blockquote div.glm-translated,
+body.glm-style-blockquote h1.glm-translated,
+body.glm-style-blockquote h2.glm-translated,
+body.glm-style-blockquote h3.glm-translated,
+body.glm-style-blockquote h4.glm-translated,
+body.glm-style-blockquote h5.glm-translated,
+body.glm-style-blockquote h6.glm-translated,
+body.glm-style-blockquote li.glm-translated {
+  padding: 4px 0 4px 8px !important;
+  margin-top: 4px !important;
+  margin-bottom: 6px !important;
+}
+
+/* 虚线下划线特定样式 */
+body.glm-style-dotted .glm-translated {
+  border-bottom: 1px dashed var(--glm-translate-color) !important;
+  padding-bottom: 2px !important;
+}
+
+/* 斜体弱化特定样式 */
+body.glm-style-italic .glm-translated {
+  font-style: italic !important;
+  opacity: 0.85 !important;
+}
+
+/* 模糊遮罩特定样式 (防偷看，鼠标悬停时清晰) */
+body.glm-style-mask .glm-translated {
+  filter: blur(5px) !important;
+  transition: filter 0.25s ease !important;
+  cursor: pointer !important;
+}
+body.glm-style-mask .glm-translated:hover {
+  filter: none !important;
+}
+
+/* 透明度弱化特定样式 (降低视觉杂音，鼠标悬停时恢复) */
+body.glm-style-weakening .glm-translated {
+  opacity: 0.618 !important;
+  transition: opacity 0.2s ease !important;
+}
+body.glm-style-weakening .glm-translated:hover {
+  opacity: 1 !important;
+}
+
+/* 引用线特定样式 (在左侧添加视觉引用边框) */
+body.glm-style-blockquote .glm-translated {
+  border-left: 3px solid var(--glm-translate-color) !important;
+  padding-left: 8px !important;
+  margin-left: 4px !important;
+  display: block !important;
 }
 
 /* 双语模式 / 仅译文模式 / 仅原文模式 控制规则 */
@@ -437,6 +562,17 @@ body.glm-mode-original-only .glm-translated {
   background-size: 200% 100% !important;
   animation: glm-skeleton-shimmer 1.6s infinite linear !important;
   box-sizing: border-box !important;
+}
+
+/* API 限频退避重试时的浅橙色骨架屏状态 */
+.glm-loading-placeholder.glm-loading-retry {
+  background: linear-gradient(
+    90deg,
+    rgba(234, 88, 12, 0.04) 25%,
+    rgba(234, 88, 12, 0.22) 50%,
+    rgba(234, 88, 12, 0.04) 75
+  ) !important;
+  animation: glm-skeleton-shimmer 1.1s infinite linear !important;
 }
 
 @keyframes glm-skeleton-shimmer {

@@ -1,5 +1,22 @@
 // Web Page Translator - content script
 
+// 广告与追踪域名黑名单，避免在垃圾页面上执行昂贵的 DOM 扫描和翻译，提升性能
+const AD_DOMAINS = [
+  'googlesyndication.com', 'doubleclick.net', 'pubmatic.com', 'google-analytics.com',
+  'analytics.google.com', 'scorecardresearch.com', 'adnxs.com', 'amazon-adsystem.com',
+  'advertising.com', 'rubiconproject.com', 'openx.net', 'criteo.com'
+];
+if (AD_DOMAINS.some(domain => window.location.hostname.includes(domain))) {
+  throw new Error('[GLM Translator] 广告/追踪域名拦截，停止运行翻译插件脚本。');
+}
+
+// 处于 iframe 容器中，且宽高小于 120px（通常为追踪像素或微小广告条），直接过滤终止
+if (window.self !== window.top) {
+  if (window.innerWidth < 120 || window.innerHeight < 120) {
+    throw new Error('[GLM Translator] 处于微小/隐藏 iframe 中，停止运行翻译插件脚本。');
+  }
+}
+
 let isTranslating = false;
 let originalBlocks = []; // 存储所有待翻译的节点和原始文本
 let modifiedLayoutElements = []; // 暂存被动态修改了布局样式的元素及其原本 inline 样式
@@ -16,23 +33,53 @@ let pendingObserveBlocks = []; // 动态扫描到的待翻译积压队列
 let observeTimeout = null; // 增量翻译的防抖定时器
 let recentObservedBlocks = new WeakMap();
 const OBSERVED_BLOCK_TTL_MS = 5000;
+let translationStyle = 'highlight'; // 默认高亮样式
+let targetLang = 'zh'; // 默认翻译目标语言
+let enableHoverTranslate = false; // 默认关闭鼠标悬浮 Alt+Hover 翻译
+let currentHoveredElement = null; // 缓存当前鼠标悬浮的待翻译段落
 
-// 初始化读取快捷键配置
-chrome.storage.local.get(['shortcutTrigger'], (res) => {
+// 初始化读取快捷键及样式配置
+chrome.storage.local.get(['shortcutTrigger', 'translationStyle', 'translatedColor', 'targetLang', 'enableHoverTranslate'], (res) => {
   if (res.shortcutTrigger) {
     currentShortcut = res.shortcutTrigger;
   }
+  if (res.translationStyle) {
+    translationStyle = res.translationStyle;
+  }
+  if (res.translatedColor) {
+    translatedColor = res.translatedColor;
+  }
+  if (res.targetLang) {
+    targetLang = res.targetLang;
+  }
+  if (res.enableHoverTranslate !== undefined) {
+    enableHoverTranslate = res.enableHoverTranslate;
+  }
+  applyTranslationStyle(translationStyle, translatedColor);
 });
 
 // 标签过滤
 const BLOCK_TAGS = ['p', 'h1', 'h2', 'h3', 'h4', 'h5', 'h6', 'blockquote', 'li', 'td', 'th', 'figcaption', 'summary', 'dd', 'dt'];
+
+// 行内元素白名单：判断一个 div 是否为"纯文本叶子块"时使用。
+// 只有当 div 的子元素全部属于这些行内标签时，才把它当作一个完整段落来翻译；
+// 只要它含有任何非行内的子元素（包括 div/section 等容器，以及 GitHub 的 <react-app>、
+// <turbo-frame> 等自定义元素），就视为布局容器，继续向下递归，绝不整块吞掉。
+const INLINE_TAGS = [
+  'a', 'span', 'b', 'i', 'em', 'strong', 'code', 'sub', 'sup', 'br', 'font',
+  'mark', 'small', 'abbr', 'time', 'u', 's', 'del', 'ins', 'cite', 'q', 'kbd',
+  'samp', 'var', 'wbr', 'bdi', 'bdo', 'label', 'output', 'data', 'dfn', 'ruby',
+  'rt', 'rp', 'tt', 'big', 'nobr'
+];
 
 // 消息监听：监听来自 popup 或 background 的指令
 chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
   if (request.action === 'start_translation') {
     translatedColor = request.settings.translatedColor;
     displayMode = request.settings.displayMode;
-    applyColorCSS(translatedColor);
+    translationStyle = request.settings.translationStyle || 'highlight';
+    targetLang = request.settings.targetLang || 'zh';
+    applyTranslationStyle(translationStyle, translatedColor);
     startPageTranslation(request.settings);
     sendResponse({ success: true });
   }
@@ -44,7 +91,23 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
 
   if (request.action === 'update_style') {
     translatedColor = request.color;
-    applyColorCSS(translatedColor);
+    if (request.translationStyle) {
+      translationStyle = request.translationStyle;
+    }
+    applyTranslationStyle(translationStyle, translatedColor);
+    sendResponse({ success: true });
+  }
+
+  // API 限频重试时的骨架屏变色通知
+  if (request.action === 'translation_retry') {
+    if (request.ids && Array.isArray(request.ids)) {
+      request.ids.forEach(id => {
+        const loader = document.querySelector(`.glm-loading-placeholder[data-loading-id="${id}"]`);
+        if (loader) {
+          loader.classList.add('glm-loading-retry');
+        }
+      });
+    }
     sendResponse({ success: true });
   }
 
@@ -72,6 +135,12 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
     currentShortcut = request.shortcut;
     sendResponse({ success: true });
   }
+
+  // 更新鼠标悬停翻译开关
+  if (request.action === 'update_hover_translate') {
+    enableHoverTranslate = request.enabled;
+    sendResponse({ success: true });
+  }
 });
 
 // 动态设置译文颜色样式
@@ -90,16 +159,33 @@ function applyColorCSS(color) {
   `;
 }
 
+// 动态应用译文显示样式与颜色
+function applyTranslationStyle(styleName, color) {
+  applyColorCSS(color);
+  
+  const styles = ['highlight', 'text-only', 'dotted', 'italic', 'mask', 'weakening', 'blockquote'];
+  styles.forEach(s => {
+    document.body.classList.remove(`glm-style-${s}`);
+  });
+  
+  const targetStyle = styleName || 'highlight';
+  document.body.classList.add(`glm-style-${targetStyle}`);
+}
+
 // =======================================================
 // DOM 遍历及解析逻辑
 // =======================================================
 
 function isTranslatable(el) {
-  const skipTags = ['script', 'style', 'code', 'pre', 'noscript', 'textarea', 'input', 'select', 'option', 'iframe', 'canvas', 'svg', 'math', 'button', 'noscript', 'annotation', 'semantics'];
+  const skipTags = ['script', 'style', 'code', 'pre', 'noscript', 'textarea', 'input', 'select', 'option', 'iframe', 'canvas', 'svg', 'math', 'button', 'annotation', 'semantics'];
   const tag = el.tagName.toLowerCase();
   
   if (skipTags.includes(tag)) return false;
-  
+
+  // 1. 检查自身的不翻译属性声明
+  if (el.getAttribute && el.getAttribute('translate') === 'no') return false;
+  if (el.classList && (el.classList.contains('notranslate') || el.classList.contains('no-translate'))) return false;
+
   // 排除已翻译节点、控制条、划词浮窗等插件自身 DOM
   if (el.hasAttribute('data-glm-translated') || 
       el.classList.contains('glm-translate-widget') || 
@@ -108,9 +194,68 @@ function isTranslatable(el) {
       el.classList.contains('glm-translation-bubble')) {
     return false;
   }
+
+  // 2. 检查父链是否有不翻译声明，向上查找直到 body
+  // 为了豁免像 GitHub 这类给高层 React 包裹容器加上 notranslate 导致的误伤，
+  // 我们在中途若遇到“允许强行翻译的正文白名单类名”则豁免更外层的不翻译声明。
+  let parent = el.parentElement;
+  let isInsideWhitelistContainer = false;
   
-  // 排除 MathJax / KaTeX 数学公式渲染出的复杂子节点，避免把公式当做独立文本翻译
-  // 确保不要误杀大排版块级标签（如 p, li, dd, dt 等），哪怕它们包含公式或被加上了类名
+  const WHITELIST_CONTAINER_CLASSES = [
+    'markdown-body', 'entry-content', 'article-content', 'article-body', 
+    'post-content', 'post-body', 'post-text', 'entry', 'article', 'main'
+  ];
+
+  while (parent && parent !== document.body) {
+    const pTag = parent.tagName ? parent.tagName.toLowerCase() : '';
+    
+    // 检查是否命中正文白名单容器
+    let hasWhitelistClass = false;
+    if (parent.className && typeof parent.className === 'string') {
+      const clsList = parent.className.split(/\s+/);
+      if (clsList.some(c => WHITELIST_CONTAINER_CLASSES.includes(c))) {
+        hasWhitelistClass = true;
+      }
+    }
+    
+    if (pTag === 'article' || pTag === 'main' || hasWhitelistClass) {
+      isInsideWhitelistContainer = true;
+    }
+
+    // 交互控件排除：整块文本若被 <a> 或 <button> 完整包裹，属于可点击的链接/按钮控件，
+    // 而非正文（如导航项、侧边栏徽标、卡片标题等），无条件跳过翻译。
+    if (pTag === 'a' || pTag === 'button') {
+      return false;
+    }
+
+    // 导航/页头/页脚区域排除：除非已确认处于正文白名单容器内，否则跳过这些结构区域，
+    // 对齐沉浸式翻译"只翻正文、不翻界面"的行为。
+    const NAV_REGION_TAGS = ['nav', 'header', 'footer'];
+    const NAV_REGION_ROLES = ['navigation', 'banner', 'contentinfo', 'menu', 'menubar', 'menuitem', 'tablist', 'tab', 'toolbar', 'search'];
+    const pRole = parent.getAttribute ? parent.getAttribute('role') : null;
+    if (!isInsideWhitelistContainer &&
+        (NAV_REGION_TAGS.includes(pTag) || (pRole && NAV_REGION_ROLES.includes(pRole)))) {
+      return false;
+    }
+
+    // 检查不翻译声明
+    let isNoTranslate = false;
+    if (parent.getAttribute && parent.getAttribute('translate') === 'no') {
+      isNoTranslate = true;
+    }
+    if (parent.classList && (parent.classList.contains('notranslate') || parent.classList.contains('no-translate'))) {
+      isNoTranslate = true;
+    }
+
+    if (isNoTranslate) {
+      // 如果遇到了不翻译声明，且我们尚未进入任何正文白名单保护区，则该元素不可翻译
+      // 如果我们已经进入了正文白名单保护区（说明 noTranslate 是外层的包装容器加的），则豁免它，继续向上查找
+      if (!isInsideWhitelistContainer) {
+        return false;
+      }
+    }
+    parent = parent.parentElement;
+  }
   if (!BLOCK_TAGS.includes(tag)) {
     const isFormulaContainer = 
       tag === 'mjx-container' || 
@@ -169,6 +314,13 @@ function extractTextAndMath(el) {
   }
 
   function traverse(node) {
+    // 增加不可翻译节点防御，杜绝把 code, pre, notranslate 内容强行提取成大块文本的漏洞
+    if (node.nodeType === Node.ELEMENT_NODE) {
+      if (!isTranslatable(node)) {
+        return '';
+      }
+    }
+
     if (isMathNode(node)) {
       mathItems.push({ type: 'node', value: node });
       return ` [M_${mathItems.length - 1}] `;
@@ -288,6 +440,19 @@ function isMetadataOrNoise(text) {
   return false;
 }
 
+// 判断一个块是否被超链接主导：其可见文字几乎全部来自 <a> 子节点。
+// 这类块通常是导航项、列表卡片标题、commit 链接等可点击 UI 元素，而非正文段落。
+// 注意：此处的链接是块的"子节点"（块包着 a），与 isTranslatable 中"块被 a 包裹"互补。
+function isLinkDominatedBlock(el) {
+  const totalLen = (el.textContent || '').replace(/\s+/g, '').length;
+  if (totalLen === 0) return false;
+  let linkLen = 0;
+  el.querySelectorAll('a').forEach(a => {
+    linkLen += (a.textContent || '').replace(/\s+/g, '').length;
+  });
+  return (linkLen / totalLen) > 0.6;
+}
+
 // 递归查找适合翻译的文本块
 function scanBlocks(element, list) {
   if (!isTranslatable(element)) return;
@@ -295,21 +460,28 @@ function scanBlocks(element, list) {
   const tagName = element.tagName.toLowerCase();
   let isBlock = BLOCK_TAGS.includes(tagName);
 
-  // 特殊处理 DIV：若无块级或容器子元素且包含文字，则视作块级翻译
+  // 特殊处理 DIV：仅当其子元素全部为行内元素（纯文本段落）时才视作块级翻译。
+  // 只要含有任何非行内子元素（容器或自定义元素），即视为布局容器，向下递归，
+  // 避免把含 <react-app> 等自定义元素的顶层容器误判成叶子块，整页文字糊成一坨。
   if (tagName === 'div') {
-    const CONTAINER_TAGS = ['div', 'ul', 'ol', 'dl', 'table', 'tbody', 'thead', 'tr', 'section', 'article', 'main', 'aside', 'header', 'footer', 'form'];
-    let hasBlockChild = false;
+    let hasNonInlineChild = false;
     for (let child of element.children) {
       if (!isTranslatable(child)) {
         continue; // 忽略公式节点等不可翻译子节点，避免干扰父 div 的 isBlock 判定
       }
       const childTag = child.tagName.toLowerCase();
-      if (BLOCK_TAGS.includes(childTag) || CONTAINER_TAGS.includes(childTag)) {
-        hasBlockChild = true;
+      if (!INLINE_TAGS.includes(childTag)) {
+        hasNonInlineChild = true;
         break;
       }
     }
-    if (!hasBlockChild) {
+    if (!hasNonInlineChild) {
+      // 检查它自身是否是一个真正的代码块容器。如果是，我们直接不翻译它，也不用向下递归了（因为无块级子元素）
+      const cls = element.className && typeof element.className === 'string' ? element.className.toLowerCase() : '';
+      const isCodeContainer = cls.includes('highlight') || cls.includes('code-block') || cls.includes('syntax') || cls.includes('monaco-editor');
+      if (isCodeContainer) {
+        return; // 直接返回，避开代码块翻译
+      }
       isBlock = true;
     }
   }
@@ -330,13 +502,24 @@ function scanBlocks(element, list) {
     // 过滤规则：
     // 1. 提取公式占位符后的纯文本长度大于 8 个字符
     // 2. 文本中必须含有英文叙述性字母，且去除公式占位符后的叙述文本仍包含字母（防止翻译纯公式或公式+数字编号）
-    // 3. 排除元数据/噪声块（如纯作者名录、邮箱列表等）
+    // 3. 排除中文比例过高的段落（当目标语言是中文时）
+    // 4. 排除元数据/噪声块（如纯作者名录、邮箱列表等）
     const hasLetters = /[a-zA-Z]/.test(textInfo.text);
     const narrativeText = textInfo.text.replace(/\[\s*M_\d+\s*\]/gi, '');
     const hasNarrativeLetters = /[a-zA-Z]/.test(narrativeText);
 
-    if (textInfo.text.length > 8 && hasLetters && hasNarrativeLetters && !isMetadataOrNoise(textInfo.text)) {
-      list.push({ 
+    const isTargetZh = /^zh/i.test(targetLang);
+    let isChineseParagraph = false;
+    if (isTargetZh) {
+      const chineseChars = narrativeText.match(/[\u4e00-\u9fff]/g) || [];
+      const totalNarrativeLen = narrativeText.replace(/\s+/g, '').length;
+      if (totalNarrativeLen > 0 && (chineseChars.length / totalNarrativeLen) > 0.8) {
+        isChineseParagraph = true;
+      }
+    }
+
+    if (textInfo.text.length > 8 && hasLetters && hasNarrativeLetters && !isChineseParagraph && !isMetadataOrNoise(textInfo.text) && !isLinkDominatedBlock(element)) {
+      list.push({
         element: element, 
         originalText: element.innerText ? element.innerText.trim() : '',
         text: textInfo.text,
@@ -456,6 +639,15 @@ function startPageTranslation(settings) {
     updateDisplayMode(settings.displayMode);
     return;
   }
+
+  // 检查页面主要语言是否已是中文且翻译目标也是中文
+  const docLang = (document.documentElement.lang || '').toLowerCase();
+  const isZhDoc = /^zh/i.test(docLang);
+  const isZhTarget = /^(zh|zh-CN|zh-TW|zh-HK)$/i.test(settings.targetLang || 'zh');
+  if (isZhDoc && isZhTarget) {
+    showFloatingToast('当前页面已是中文，无需重复翻译。', 'info');
+    return;
+  }
   
   isTranslating = true;
   originalBlocks = [];
@@ -470,6 +662,16 @@ function startPageTranslation(settings) {
   // 1. 扫描页面中所有的文本块
   scanBlocks(document.body, originalBlocks);
   totalBlocksCount = originalBlocks.length;
+  
+  console.log('[GLM Translator] 页面扫描完成。总段落数:', totalBlocksCount);
+  if (totalBlocksCount > 0) {
+    console.log('[GLM Translator] 扫描到的前 10 段样本:', originalBlocks.slice(0, 10).map(b => ({
+      id: b.id,
+      tag: b.element.tagName,
+      class: b.element.className,
+      text: b.text.substring(0, 60)
+    })));
+  }
   
   if (totalBlocksCount === 0) {
     showFloatingToast('未在当前页面检测到可翻译的英文文本。', 'info');
@@ -528,6 +730,7 @@ async function processBatches(batches, sourceLang, targetLang, translateEngine) 
   const maxConcurrency =
     translateEngine === 'local-llm' ? 1 :
     translateEngine === 'google' ? 2 :
+    translateEngine === 'zhipu' ? 3 : // 智谱收紧并发防限制
     5;
   let index = 0;
 
@@ -573,7 +776,10 @@ async function processBatches(batches, sourceLang, targetLang, translateEngine) 
 
   // 启动并发通道
   for (let i = 0; i < Math.min(maxConcurrency, batches.length); i++) {
-    runNext();
+    // 300ms 错峰间隔启动，降低突发并发请求
+    setTimeout(() => {
+      runNext();
+    }, i * 300);
   }
 }
 
@@ -597,28 +803,14 @@ function sendBatchTranslationMessage(payload, sourceLang, targetLang, translateE
 
 // 插入骨架屏 Loading 占位节点
 function insertLoadingSkeleton(originalEl, id) {
-  // 避免重复插入 Loading
   if (originalEl.hasAttribute('data-glm-id')) return;
   const existingLoader = document.querySelector(`.glm-loading-placeholder[data-loading-id="${id}"]`);
   if (existingLoader) return;
 
-  const tag = originalEl.tagName.toLowerCase();
-  
-  if (tag === 'li' || tag === 'td' || tag === 'th') {
-    const loader = document.createElement('div');
-    loader.className = 'glm-translated glm-loading-placeholder';
-    loader.setAttribute('data-loading-id', id);
-    originalEl.appendChild(loader);
-  } else {
-    let targetTag = tag;
-    if (!['p', 'h1', 'h2', 'h3', 'h4', 'h5', 'h6', 'blockquote'].includes(tag)) {
-      targetTag = 'div';
-    }
-    const loader = document.createElement(targetTag);
-    loader.className = 'glm-translated glm-loading-placeholder';
-    loader.setAttribute('data-loading-id', id);
-    originalEl.parentNode.insertBefore(loader, originalEl.nextSibling);
-  }
+  const loader = document.createElement('span');
+  loader.className = 'glm-translated glm-loading-placeholder';
+  loader.setAttribute('data-loading-id', id);
+  originalEl.appendChild(loader);
 }
 
 // 移除骨架屏 Loading 占位节点
@@ -673,38 +865,25 @@ function insertTranslations(results, batch) {
     const tag = originalEl.tagName.toLowerCase();
     originalEl.setAttribute('data-glm-id', orig.id);
 
-    let targetTag = tag;
-    if (!['p', 'h1', 'h2', 'h3', 'h4', 'h5', 'h6', 'blockquote'].includes(tag)) {
-      targetTag = 'div';
-    }
-
     let transEl;
-    if (tag === 'li' || tag === 'td' || tag === 'th') {
-      // 子元素模式：译文作为子节点插入原文容器内部
-      // 需要先将原文内容包裹到 span.glm-original-content 中，
-      // 以便译文模式下能单独隐藏原文内容而不影响译文显示
-      originalEl.setAttribute('data-glm-inline', 'true');
-      if (!originalEl.querySelector('.glm-original-content')) {
-        const wrapper = document.createElement('span');
-        wrapper.className = 'glm-original-content';
-        // 将原文元素的所有子节点移入包裹 span
-        while (originalEl.firstChild) {
-          wrapper.appendChild(originalEl.firstChild);
-        }
-        originalEl.appendChild(wrapper);
+    // 统一使用子元素模式：译文作为子节点插入原文容器内部，
+    // 避免在 flex/grid 父容器中插入兄弟节点破坏页面布局。
+    // li/td/th 用 div，其余用 span（防止 div 插入 p/h1 等导致浏览器自动闭合标签）
+    const transTag = (tag === 'li' || tag === 'td' || tag === 'th') ? 'div' : 'span';
+    originalEl.setAttribute('data-glm-inline', 'true');
+    if (!originalEl.querySelector('.glm-original-content')) {
+      const wrapper = document.createElement('span');
+      wrapper.className = 'glm-original-content';
+      while (originalEl.firstChild) {
+        wrapper.appendChild(originalEl.firstChild);
       }
-      transEl = document.createElement('div');
-      transEl.className = 'glm-translated';
-      transEl.setAttribute('data-glm-translated', 'true');
-      renderTranslationContent(transEl, translatedText, orig.mathItems, orig.linkElements);
-      originalEl.appendChild(transEl);
-    } else {
-      transEl = document.createElement(targetTag);
-      transEl.className = 'glm-translated';
-      transEl.setAttribute('data-glm-translated', 'true');
-      renderTranslationContent(transEl, translatedText, orig.mathItems, orig.linkElements);
-      originalEl.parentNode.insertBefore(transEl, originalEl.nextSibling);
+      originalEl.appendChild(wrapper);
     }
+    transEl = document.createElement(transTag);
+    transEl.className = 'glm-translated';
+    transEl.setAttribute('data-glm-translated', 'true');
+    renderTranslationContent(transEl, translatedText, orig.mathItems, orig.linkElements);
+    originalEl.appendChild(transEl);
 
 
     // 渲染后二次校验：如果翻译元素内没有可见文字内容，立即移除，绝不允许显示空紫色条
@@ -861,20 +1040,7 @@ function renderTranslationContent(containerEl, translatedText, mathItems, linkEl
 }
 
 function findExistingTranslation(el) {
-  const tag = el.tagName.toLowerCase();
-  if (tag === 'li' || tag === 'td' || tag === 'th') {
-    return el.querySelector('.glm-translated[data-glm-translated="true"]');
-  } else {
-    // 兄弟节点
-    let sib = el.nextSibling;
-    while (sib) {
-      if (sib.nodeType === Node.ELEMENT_NODE && sib.classList.contains('glm-translated')) {
-        return sib;
-      }
-      sib = sib.nextSibling;
-    }
-  }
-  return null;
+  return el.querySelector('.glm-translated[data-glm-translated="true"]');
 }
 
 // 恢复网页原文
@@ -913,8 +1079,11 @@ function restorePage() {
   const origEls = document.querySelectorAll('[data-glm-id]');
   origEls.forEach(el => el.removeAttribute('data-glm-id'));
 
-  // 4. 清理 body 样式模式类
+  // 4. 清理 body 样式模式类与样式类
   document.body.classList.remove('glm-mode-translation-only', 'glm-mode-original-only', 'glm-mode-bilingual');
+  ['highlight', 'text-only', 'dotted', 'italic', 'mask', 'weakening', 'blockquote'].forEach(s => {
+    document.body.classList.remove(`glm-style-${s}`);
+  });
 
   // 5. 清除控制面板
   const widget = document.getElementById('glm-widget');
@@ -1600,5 +1769,170 @@ document.addEventListener('keydown', (e) => {
   if (e.altKey && e.key.toLowerCase() === 'r') {
     e.preventDefault();
     restorePage();
+  }
+});
+
+// =======================================================
+// 10. 鼠标悬停按住修饰键翻译（Alt + Hover）
+// =======================================================
+
+// 递归查找鼠标所指向的最具体的、可翻译的块级文本节点
+function findTranslatableBlock(element) {
+  let el = element;
+  while (el && el !== document.body) {
+    if (!isTranslatable(el)) {
+      el = el.parentElement;
+      continue;
+    }
+    const tag = el.tagName ? el.tagName.toLowerCase() : '';
+    let isBlock = BLOCK_TAGS.includes(tag);
+    
+    // 特殊处理 div 是否视作块级翻译（与 scanBlocks 保持一致：行内白名单判定）
+    if (tag === 'div') {
+      let hasNonInlineChild = false;
+      for (let child of el.children) {
+        if (!isTranslatable(child)) continue;
+        const childTag = child.tagName.toLowerCase();
+        if (!INLINE_TAGS.includes(childTag)) {
+          hasNonInlineChild = true;
+          break;
+        }
+      }
+      if (!hasNonInlineChild) {
+        // 检查它自身是否是一个真正的代码块容器。如果是，我们直接不翻译它，也不向上递归
+        const cls = el.className && typeof el.className === 'string' ? el.className.toLowerCase() : '';
+        const isCodeContainer = cls.includes('highlight') || cls.includes('code-block') || cls.includes('syntax') || cls.includes('monaco-editor');
+        if (isCodeContainer) {
+          el = el.parentElement;
+          continue; // 直接跳过此纯代码容器
+        }
+        isBlock = true;
+      }
+    }
+    
+    if (isBlock) {
+      const textInfo = extractTextAndMath(el);
+      
+      // 过滤表格单元格过短情况
+      if (['td', 'th'].includes(tag)) {
+        const words = textInfo.text.split(/\s+/).filter(w => w.length > 0);
+        if (textInfo.text.length < 25 || words.length < 5) {
+          el = el.parentElement;
+          continue;
+        }
+      }
+      
+      const hasLetters = /[a-zA-Z]/.test(textInfo.text);
+      const narrativeText = textInfo.text.replace(/\[\s*M_\d+\s*\]/gi, '');
+      const hasNarrativeLetters = /[a-zA-Z]/.test(narrativeText);
+      
+      // 中文段落过滤
+      const isTargetZh = /^zh/i.test(targetLang);
+      let isChineseParagraph = false;
+      if (isTargetZh) {
+        const chineseChars = narrativeText.match(/[\u4e00-\u9fff]/g) || [];
+        const totalNarrativeLen = narrativeText.replace(/\s+/g, '').length;
+        if (totalNarrativeLen > 0 && (chineseChars.length / totalNarrativeLen) > 0.8) {
+          isChineseParagraph = true;
+        }
+      }
+
+      if (textInfo.text.length > 8 && hasLetters && hasNarrativeLetters && !isChineseParagraph && !isMetadataOrNoise(textInfo.text) && !isLinkDominatedBlock(el)) {
+        return el;
+      }
+    }
+    el = el.parentElement;
+  }
+  return null;
+}
+
+// 触发对单个悬浮文本块的异步翻译
+function triggerHoverTranslation(el) {
+  if (!el) return;
+  // 避免在已翻译、正处于骨架屏加载、或者已有译文段落的元素上重复触发
+  if (el.hasAttribute('data-glm-id') || el.hasAttribute('data-glm-scanned') || el.classList.contains('glm-translated') || findExistingTranslation(el)) {
+    return;
+  }
+
+  // 设置扫描中状态防重入
+  el.setAttribute('data-glm-scanned', 'true');
+  const textInfo = extractTextAndMath(el);
+  
+  const batchItem = {
+    id: 999999 + Math.floor(Math.random() * 100000), // 生成唯一 ID
+    element: el,
+    text: textInfo.text,
+    mathItems: textInfo.mathItems,
+    linkElements: textInfo.linkElements
+  };
+
+  // 1. 插入骨架屏 Loading
+  insertLoadingSkeleton(el, batchItem.id);
+
+  // 2. 发送单文本块翻译消息
+  chrome.storage.local.get(['targetLang', 'translateEngine', 'apiKey'], (res) => {
+    const engine = res.translateEngine || 'zhipu';
+    const target = res.targetLang || 'zh';
+    const apiKey = res.apiKey || '';
+
+    if (engine === 'zhipu' && !apiKey) {
+      removeLoadingSkeleton(el, batchItem.id);
+      el.removeAttribute('data-glm-scanned');
+      showFloatingToast('请先配置大模型 API Key！', 'error');
+      return;
+    }
+    
+    chrome.runtime.sendMessage({
+      action: 'translate_batch',
+      texts: { [batchItem.id]: batchItem.text },
+      sourceLang: 'auto',
+      targetLang: target,
+      translateEngine: engine,
+      apiKey: apiKey
+    }, (response) => {
+      if (response && response.success && response.results && response.results[batchItem.id]) {
+        // 3. 渲染译文并同步样式
+        insertTranslations(response.results, [batchItem]);
+      } else {
+        // 4. 失败清除 Loading
+        removeLoadingSkeleton(el, batchItem.id);
+        el.removeAttribute('data-glm-scanned');
+        console.error('单段悬停翻译失败:', response ? response.error : '未知错误');
+      }
+    });
+  });
+}
+
+// 全局鼠标悬浮监听与按键识别
+document.addEventListener('mousemove', (e) => {
+  if (!enableHoverTranslate) return;
+
+  // 排除自身的组件元素
+  if (e.target.closest('.glm-translate-widget') || e.target.closest('.glm-translation-bubble') || e.target.closest('.glm-float-btn')) {
+    currentHoveredElement = null;
+    return;
+  }
+
+  const block = findTranslatableBlock(e.target);
+  currentHoveredElement = block;
+
+  // 如果按住了 Alt 键且移动到可翻译的段落上，触发翻译
+  if (e.altKey && block) {
+    triggerHoverTranslation(block);
+  }
+});
+
+// 支持按住 Alt 键瞬间对当前已悬浮的段落进行翻译
+document.addEventListener('keydown', (e) => {
+  if (!enableHoverTranslate) return;
+
+  // 如果焦点在可输入节点中，则不触发
+  const activeEl = document.activeElement;
+  if (activeEl && (['input', 'textarea', 'select'].includes(activeEl.tagName.toLowerCase()) || activeEl.isContentEditable)) {
+    return;
+  }
+
+  if (e.key === 'Alt' && currentHoveredElement) {
+    triggerHoverTranslation(currentHoveredElement);
   }
 });

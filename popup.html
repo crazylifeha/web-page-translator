@@ -141,6 +141,31 @@
           </div>
         </div>
 
+        <div class="form-row-mix" style="margin-top: 8px;">
+          <div class="form-col-left">
+            <label for="enable-hover-translate">按住 Alt 键悬停翻译</label>
+          </div>
+          <div class="form-col-right">
+            <label class="switch">
+              <input type="checkbox" id="enable-hover-translate">
+              <span class="slider"></span>
+            </label>
+          </div>
+        </div>
+
+        <div class="form-row">
+          <label for="translation-style">译文显示样式</label>
+          <select id="translation-style">
+            <option value="highlight" selected>背景高亮 (默认)</option>
+            <option value="text-only">纯文字对照</option>
+            <option value="dotted">虚线下划线</option>
+            <option value="italic">斜体弱化</option>
+            <option value="mask">模糊遮罩 (防偷看)</option>
+            <option value="weakening">透明度弱化</option>
+            <option value="blockquote">引用线样式</option>
+          </select>
+        </div>
+
         <div class="form-row shortcut-setting-row">
           <label for="shortcut-trigger-input">触发翻译快捷键</label>
           <div class="shortcut-recorder-wrapper">

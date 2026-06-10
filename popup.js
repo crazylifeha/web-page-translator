@@ -8,7 +8,9 @@ document.addEventListener('DOMContentLoaded', () => {
   const targetLangSelect = document.getElementById('target-lang');
   const displayModeSelect = document.getElementById('display-mode');
   const enableSelectionTranslateInput = document.getElementById('enable-selection-translate');
+  const enableHoverTranslateInput = document.getElementById('enable-hover-translate');
   const shortcutInput = document.getElementById('shortcut-trigger-input');
+  const translationStyleSelect = document.getElementById('translation-style');
   const btnResetShortcut = document.getElementById('btn-reset-shortcut');
   const apiStatusBadge = document.getElementById('api-status');
   const btnTranslate = document.getElementById('btn-translate');
@@ -62,7 +64,10 @@ document.addEventListener('DOMContentLoaded', () => {
   }
 
   // 1. 初始化加载配置
-  chrome.storage.local.get(['apiKey', 'sourceLang', 'targetLang', 'displayMode', 'translatedColor', 'enableSelectionTranslate', 'shortcutTrigger', 'translateEngine', 'detectedModel', 'localApiUrl', 'localModelName', 'localApiKey'], (res) => {
+  chrome.storage.local.get(['apiKey', 'sourceLang', 'targetLang', 'displayMode', 'translatedColor', 'enableSelectionTranslate', 'enableHoverTranslate', 'shortcutTrigger', 'translateEngine', 'detectedModel', 'localApiUrl', 'localModelName', 'localApiKey', 'translationStyle'], (res) => {
+    if (res.translationStyle && translationStyleSelect) {
+      translationStyleSelect.value = res.translationStyle;
+    }
     // 默认翻译引擎为 zhipu
     const activeEngine = res.translateEngine || 'zhipu';
     if (translateEngineSelect) translateEngineSelect.value = activeEngine;
@@ -101,6 +106,11 @@ document.addEventListener('DOMContentLoaded', () => {
     
     // 默认开启划词翻译 (undefined 也视为 true 开启)
     enableSelectionTranslateInput.checked = res.enableSelectionTranslate !== false;
+
+    // 默认关闭悬停翻译
+    if (enableHoverTranslateInput) {
+      enableHoverTranslateInput.checked = res.enableHoverTranslate === true;
+    }
 
     // 默认快捷键 Alt+C
     const shortcutVal = res.shortcutTrigger || 'Alt+C';
@@ -477,10 +487,47 @@ document.addEventListener('DOMContentLoaded', () => {
     chrome.storage.local.set({ displayMode: e.target.value });
   });
 
+  if (translationStyleSelect) {
+    translationStyleSelect.addEventListener('change', (e) => {
+      const styleVal = e.target.value;
+      chrome.storage.local.set({ translationStyle: styleVal });
+      
+      chrome.tabs.query({ active: true, currentWindow: true }, (tabs) => {
+        if (tabs[0] && tabs[0].id) {
+          chrome.tabs.sendMessage(tabs[0].id, { 
+            action: 'update_style', 
+            color: selectedColor,
+            translationStyle: styleVal
+          }, () => {
+            if (chrome.runtime.lastError) { /* ignore */ }
+          });
+        }
+      });
+    });
+  }
+
   // 保存划词翻译开关状态
   enableSelectionTranslateInput.addEventListener('change', (e) => {
     chrome.storage.local.set({ enableSelectionTranslate: e.target.checked });
   });
+
+  // 保存悬停翻译开关状态并同步到当前标签页
+  if (enableHoverTranslateInput) {
+    enableHoverTranslateInput.addEventListener('change', (e) => {
+      const isEnabled = e.target.checked;
+      chrome.storage.local.set({ enableHoverTranslate: isEnabled });
+      chrome.tabs.query({ active: true, currentWindow: true }, (tabs) => {
+        if (tabs[0] && tabs[0].id) {
+          chrome.tabs.sendMessage(tabs[0].id, {
+            action: 'update_hover_translate',
+            enabled: isEnabled
+          }, () => {
+            if (chrome.runtime.lastError) { /* ignore */ }
+          });
+        }
+      });
+    });
+  }
 
   // 保存翻译引擎设置并切换配置UI
   if (translateEngineSelect) {
@@ -584,7 +631,8 @@ document.addEventListener('DOMContentLoaded', () => {
         if (tabs[0] && tabs[0].id) {
           chrome.tabs.sendMessage(tabs[0].id, { 
             action: 'update_style', 
-            color: selectedColor 
+            color: selectedColor,
+            translationStyle: translationStyleSelect ? translationStyleSelect.value : 'highlight'
           }, () => {
             // 忽略由于页面未加载 content.js 导致的报错
             if (chrome.runtime.lastError) { /* ignore */ }
@@ -622,7 +670,8 @@ document.addEventListener('DOMContentLoaded', () => {
         if (tabs[0] && tabs[0].id) {
           chrome.tabs.sendMessage(tabs[0].id, { 
             action: 'update_style', 
-            color: color 
+            color: color,
+            translationStyle: translationStyleSelect ? translationStyleSelect.value : 'highlight'
           }, () => {
             if (chrome.runtime.lastError) { /* ignore */ }
           });
@@ -636,7 +685,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
   // 获取当前所有设置参数的辅助函数
   function getSettings(callback) {
-    chrome.storage.local.get(['apiKey', 'sourceLang', 'targetLang', 'displayMode', 'translatedColor', 'translateEngine', 'localApiUrl', 'localModelName', 'localApiKey'], (res) => {
+    chrome.storage.local.get(['apiKey', 'sourceLang', 'targetLang', 'displayMode', 'translatedColor', 'translateEngine', 'localApiUrl', 'localModelName', 'localApiKey', 'translationStyle', 'enableHoverTranslate'], (res) => {
       callback({
         apiKey: res.apiKey || '',
         sourceLang: res.sourceLang || 'auto',
@@ -646,7 +695,9 @@ document.addEventListener('DOMContentLoaded', () => {
         translateEngine: res.translateEngine || 'zhipu',
         localApiUrl: res.localApiUrl || 'http://localhost:1234/v1/chat/completions',
         localModelName: res.localModelName || 'qwen2.5',
-        localApiKey: res.localApiKey || ''
+        localApiKey: res.localApiKey || '',
+        translationStyle: res.translationStyle || 'highlight',
+        enableHoverTranslate: res.enableHoverTranslate === true
       });
     });
   }

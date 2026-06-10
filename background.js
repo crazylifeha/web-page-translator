@@ -116,7 +116,8 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
           return;
         }
         
-        translateBatchTexts(request.texts, request.sourceLang, request.targetLang, engineSettings)
+        const tabId = sender.tab ? sender.tab.id : null;
+        translateBatchTexts(request.texts, request.sourceLang, request.targetLang, engineSettings, tabId)
           .then(results => sendResponse({ success: true, results }))
           .catch(err => sendResponse({ success: false, error: err.message }));
       });
@@ -231,20 +232,31 @@ async function translateSingleText(text, sourceLang, targetLang, engineSettings)
   return requestLLMTranslation(messages, false, engineSettings);
 }
 
-async function translateBatchTexts(textsArray, sourceLang, targetLang, engineSettings) {
-  const maxRetries = 2;
+async function translateBatchTexts(textsDict, sourceLang, targetLang, engineSettings, tabId) {
+  const maxRetries = 3;
   let attempt = 0;
 
   while (attempt <= maxRetries) {
     try {
-      return await doTranslateBatch(textsArray, sourceLang, targetLang, engineSettings);
+      return await doTranslateBatch(textsDict, sourceLang, targetLang, engineSettings);
     } catch (err) {
       attempt++;
       if (attempt > maxRetries) {
         throw err;
       }
-      console.warn(`翻译批次失败，正在进行第 ${attempt} 次重试... 错误: ${err.message}`);
-      await new Promise(resolve => setTimeout(resolve, attempt * 1000));
+      const delay = Math.pow(2, attempt) * 1500;
+      console.warn(`翻译批次失败，正在进行第 ${attempt} 次重试... 等待 ${delay}ms。 错误: ${err.message}`);
+      
+      if (tabId) {
+        chrome.tabs.sendMessage(tabId, {
+          action: 'translation_retry',
+          ids: Object.keys(textsDict)
+        }, () => {
+          if (chrome.runtime.lastError) { /* ignore */ }
+        });
+      }
+      
+      await new Promise(resolve => setTimeout(resolve, delay));
     }
   }
 }
